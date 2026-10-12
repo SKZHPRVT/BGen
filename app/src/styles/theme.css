@@ -1,0 +1,243 @@
+:root {
+  --bg: var(--tg-theme-bg-color, #ffffff);
+  --text: var(--tg-theme-text-color, #000000);
+  --hint: var(--tg-theme-hint-color, #999999);
+  --link: var(--tg-theme-link-color, #2481cc);
+  --button: var(--tg-theme-button-color, #2481cc);
+  --button-text: var(--tg-theme-button-text-color, #ffffff);
+  --secondary-bg: var(--tg-theme-secondary-bg-color, #f1f1f1);
+  --card-bg: var(--tg-theme-secondary-bg-color, #f8f8f8);
+  --radius: 12px;
+  --radius-lg: 16px;
+  --gap: 12px;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  min-height: 100vh;
+  overscroll-behavior: none;
+}
+
+#app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 12px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bgen-header h1 {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.bgen-header .subtitle {
+  margin: 0;
+  color: var(--hint);
+  font-size: 14px;
+}
+
+.bgen-controls,
+.bgen-preview,
+.bgen-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.bgen-input {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  font-family: inherit;
+  border: 1px solid var(--secondary-bg);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  color: var(--text);
+  resize: none;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.bgen-input:focus {
+  border-color: var(--button);
+}
+
+.bgen-input-small {
+  padding: 10px 12px;
+  font-size: 15px;
+}
+
+.bgen-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.bgen-select {
+  flex: 0 0 auto;
+  padding: 12px;
+  font-size: 15px;
+  font-family: inherit;
+  border: 1px solid var(--secondary-bg);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  color: var(--text);
+  outline: none;
+}
+
+.bgen-btn {
+  padding: 14px 18px;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--secondary-bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.05s;
+  user-select: none;
+}
+
+.bgen-btn:active {
+  transform: scale(0.98);
+}
+
+.bgen-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bgen-btn-primary {
+  flex: 1;
+  background: var(--button);
+  color: var(--button-text);
+}
+
+.bgen-btn-icon {
+  padding: 8px 12px;
+  font-size: 18px;
+  min-width: 40px;
+}
+
+.bgen-status {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  font-size: 14px;
+  color: var(--hint);
+}
+
+.bgen-status.error {
+  color: #d33;
+  background: rgba(221, 51, 51, 0.1);
+}
+
+.bgen-status.success {
+  color: #2a9;
+  background: rgba(42, 153, 153, 0.1);
+}
+
+.bgen-status.loading::after {
+  content: "…";
+  animation: dots 1.2s steps(4, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: ""; }
+  40% { content: "."; }
+  60% { content: ".."; }
+  80%, 100% { content: "..."; }
+}
+
+.bgen-iteration {
+  display: flex;
+  gap: 8px;
+}
+
+.bgen-iteration .bgen-input {
+  flex: 1;
+}
+
+.bgen-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.bgen-meta {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bgen-frame {
+  width: 100%;
+  height: 60vh;
+  min-height: 360px;
+  border: 1px solid var(--secondary-bg);
+  border-radius: var(--radius-lg);
+  background: #000;
+  display: block;
+}
+
+.bgen-frame:fullscreen {
+  height: 100vh;
+  border-radius: 0;
+}
+
+.bgen-gallery-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.bgen-gallery-item {
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.bgen-gallery-item:active {
+  transform: scale(0.97);
+}
+
+.bgen-gallery-item .title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bgen-gallery-item .meta {
+  font-size: 12px;
+  color: var(--hint);
+}
+
+@media (max-width: 480px) {
+  .bgen-row {
+    flex-direction: column;
+  }
+  .bgen-frame {
+    height: 55vh;
+  }
+}

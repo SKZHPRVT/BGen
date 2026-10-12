@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0" />
+  <title>BGen — ИИ-генератор игр</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div id="app">
+    <header class="bgen-header">
+      <h1>🎮 BGen</h1>
+      <p class="subtitle">ИИ-генератор браузерных игр</p>
+    </header>
+
+    <section class="bgen-controls">
+      <textarea
+        id="promptInput"
+        class="bgen-input"
+        placeholder="замути змейку для бабушки"
+        rows="2"
+        maxlength="500"
+      ></textarea>
+
+      <div class="bgen-row">
+        <select id="audienceSelect" class="bgen-select">
+          <option value="default">🎯 Обычная</option>
+          <option value="elderly">👵 Для бабушки</option>
+          <option value="kids">🧒 Для детей</option>
+          <option value="hardcore">🔥 Хардкор</option>
+        </select>
+
+        <button id="generateBtn" class="bgen-btn bgen-btn-primary">
+          ✨ Создать игру
+        </button>
+      </div>
+
+      <div id="statusBar" class="bgen-status" hidden></div>
+
+      <div id="iterationPanel" class="bgen-iteration" hidden>
+        <input
+          id="iterationInput"
+          class="bgen-input bgen-input-small"
+          placeholder="сделай кнопки больше / добавь уровни..."
+          maxlength="200"
+        />
+        <button id="iterateBtn" class="bgen-btn">🔧 Доработать</button>
+      </div>
+    </section>
+
+    <section class="bgen-preview">
+      <div class="bgen-preview-header">
+        <span id="previewMeta" class="bgen-meta">Игра появится здесь</span>
+        <button id="fullscreenBtn" class="bgen-btn bgen-btn-icon" title="На весь экран" hidden>⛶</button>
+        <button id="restartBtn" class="bgen-btn bgen-btn-icon" title="Начать заново" hidden>⟳</button>
+      </div>
+      <iframe
+        id="gameFrame"
+        class="bgen-frame"
+        sandbox="allow-scripts allow-pointer-lock allow-same-origin"
+        title="Сгенерированная игра"
+      ></iframe>
+    </section>
+
+    <section id="gallerySection" class="bgen-gallery" hidden>
+      <h2>📚 Мои игры</h2>
+      <div id="galleryList" class="bgen-gallery-list"></div>
+    </section>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
