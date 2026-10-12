@@ -1,8 +1,17 @@
 node_modules/
 dist/
+build/
 .env
 .env.local
+.env.*.local
 *.log
+npm-debug.log*
+yarn-error.log*
 .DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
 server/data/
 core/cache-data/
+*.tsbuildinfo
+coverage/
