@@ -1,8 +1,10 @@
-import { tg } from "./tg.ts";
+import { getInitData, isTelegram } from "./tg.ts";
 
 // В dev-режиме: пусто → Vite проксирует /api на localhost:3000
-// В проде (Pages): абсолютный URL до сервера, задаётся через VITE_API_URL
-const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+// В проде (Pages): абсолютный URL, задаётся через VITE_API_URL
+const API_BASE =
+  (import.meta.env.VITE_API_URL as string | undefined) ??
+  "https://bgenserver-production.up.railway.app";
 
 export interface GenerateRequest {
   prompt: string;
@@ -38,8 +40,10 @@ export class ApiError extends Error {
 
 function authHeaders(): Record<string, string> {
   const headers: Record<string, string> = { "content-type": "application/json" };
-  const initData = tg?.initData;
-  if (initData) headers["X-Telegram-Init-Data"] = initData;
+  if (isTelegram) {
+    const initData = getInitData();
+    if (initData) headers["X-Telegram-Init-Data"] = initData;
+  }
   return headers;
 }
 

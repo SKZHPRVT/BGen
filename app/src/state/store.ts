@@ -1,6 +1,4 @@
-/**
- * Простейшее observable-хранилище без зависимостей.
- */
+import { storage } from "./storage.ts";
 
 export interface GameRecord {
   id: string;
@@ -35,9 +33,23 @@ class Store {
     history: [],
   };
   private listeners: Set<Listener> = new Set();
+  private loaded = false;
 
-  constructor() {
-    this.state.history = this.loadHistory();
+  async load(): Promise<void> {
+    if (this.loaded) return;
+    this.loaded = true;
+    try {
+      const raw = await storage.get(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as GameRecord[];
+        if (Array.isArray(parsed)) {
+          this.state.history = parsed.slice(0, MAX_HISTORY);
+          this.emit();
+        }
+      }
+    } catch (e) {
+      console.warn("[store] load failed", e);
+    }
   }
 
   get(): State { return this.state; }
@@ -50,42 +62,37 @@ class Store {
 
   set(patch: Partial<State>): void {
     this.state = { ...this.state, ...patch };
-    for (const fn of this.listeners) fn(this.state);
+    this.emit();
   }
 
   async addGame(rec: GameRecord): Promise<void> {
     this.state.history = [rec, ...this.state.history].slice(0, MAX_HISTORY);
-    this.saveHistory();
-    this.set({ currentGame: rec });
+    this.state.currentGame = rec;
+    this.emit();
+    await this.persist();
   }
 
-  removeGame(id: string): void {
+  async removeGame(id: string): Promise<void> {
     this.state.history = this.state.history.filter((g) => g.id !== id);
-    this.saveHistory();
-    this.set({});
+    this.emit();
+    await this.persist();
   }
 
-  clearHistory(): void {
+  async clearHistory(): Promise<void> {
     this.state.history = [];
-    this.saveHistory();
-    this.set({});
+    this.emit();
+    await this.persist();
   }
 
-  private saveHistory(): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state.history));
-    } catch {
-      /* quota */
-    }
+  private emit(): void {
+    for (const fn of this.listeners) fn(this.state);
   }
 
-  private loadHistory(): GameRecord[] {
+  private async persist(): Promise<void> {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
-      return JSON.parse(raw) as GameRecord[];
-    } catch {
-      return [];
+      await storage.set(STORAGE_KEY, JSON.stringify(this.state.history));
+    } catch (e) {
+      console.warn("[store] persist failed", e);
     }
   }
 }

@@ -1,13 +1,15 @@
 import "./styles/theme.css";
-import { initTelegram, haptic } from "./tg.ts";
+import { initPlatform, haptic } from "./tg.ts";
+import { platform } from "./platform.ts";
 import { generate, iterate, ApiError } from "./api.ts";
 import { store, type GameRecord } from "./state/store.ts";
 import { mountPromptInput, renderStatus, setLoading } from "./ui/promptInput.ts";
 import { mountPreview, renderGame } from "./ui/previewFrame.ts";
 import { mountIteration, showIteration, setIterationLoading } from "./ui/iterationBar.ts";
 import { mountGallery, renderGallery } from "./ui/gallery.ts";
+import { shareGame } from "./ui/share.ts";
 
-initTelegram();
+initPlatform();
 
 const promptEl = mountPromptInput();
 const previewEl = mountPreview();
@@ -16,7 +18,6 @@ const galleryEl = mountGallery();
 
 let lastGame: GameRecord | null = null;
 
-// Синхронизация UI с состоянием
 store.subscribe((state) => {
   renderStatus(promptEl.statusBar, state);
   setLoading(promptEl, state.loading);
@@ -134,6 +135,20 @@ async function onIterate(): Promise<void> {
   }
 }
 
+async function onShare(): Promise<void> {
+  if (!lastGame) return;
+  const res = await shareGame(lastGame);
+  if (res.ok) {
+    store.set({
+      status: res.message ?? "Ссылка для шаринга готова",
+      statusType: "success",
+    });
+  } else if (res.message) {
+    store.set({ status: res.message, statusType: "error" });
+  }
+}
+
+// Монтирование обработчиков
 promptEl.generateBtn.addEventListener("click", onGenerate);
 iterationEl.button.addEventListener("click", onIterate);
 
@@ -151,4 +166,12 @@ iterationEl.input.addEventListener("keydown", (e) => {
   }
 });
 
-console.log("[BGen] App initialized");
+// Кнопка Share — привяжется, если есть в DOM
+const shareBtn = document.getElementById("shareBtn");
+if (shareBtn) shareBtn.addEventListener("click", onShare);
+
+// Финальный boot — грузим историю и подписываемся на неё
+(async () => {
+  await store.load();
+  console.log(`[BGen] Ready in ${platform.kind} mode`);
+})();

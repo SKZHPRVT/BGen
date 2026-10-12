@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BGen — ИИ-генератор игр</title>
+  <!-- Telegram SDK: грузится всегда, но вне Telegram становится no-op -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
@@ -54,6 +55,7 @@
     <section class="bgen-preview">
       <div class="bgen-preview-header">
         <span id="previewMeta" class="bgen-meta">Игра появится здесь</span>
+        <button id="shareBtn" class="bgen-btn bgen-btn-icon" title="Поделиться" hidden>↗</button>
         <button id="fullscreenBtn" class="bgen-btn bgen-btn-icon" title="На весь экран" hidden>⛶</button>
         <button id="restartBtn" class="bgen-btn bgen-btn-icon" title="Начать заново" hidden>⟳</button>
       </div>

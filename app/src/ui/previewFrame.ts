@@ -1,8 +1,14 @@
+/**
+ * Превью-фрейм: iframe с srcdoc, куда вставляется HTML игры.
+ * Плюс кнопки restart / fullscreen / share.
+ */
+
 export interface PreviewElements {
   frame: HTMLIFrameElement;
   meta: HTMLSpanElement;
   restartBtn: HTMLButtonElement;
   fullscreenBtn: HTMLButtonElement;
+  shareBtn: HTMLButtonElement | null;
 }
 
 export function mountPreview(): PreviewElements {
@@ -10,6 +16,7 @@ export function mountPreview(): PreviewElements {
   const meta = document.getElementById("previewMeta") as HTMLSpanElement;
   const restartBtn = document.getElementById("restartBtn") as HTMLButtonElement;
   const fullscreenBtn = document.getElementById("fullscreenBtn") as HTMLButtonElement;
+  const shareBtn = document.getElementById("shareBtn") as HTMLButtonElement | null;
 
   if (!frame || !meta || !restartBtn || !fullscreenBtn) {
     throw new Error("Preview: missing DOM elements");
@@ -18,7 +25,9 @@ export function mountPreview(): PreviewElements {
   restartBtn.addEventListener("click", () => {
     const html = frame.srcdoc;
     frame.srcdoc = "";
-    requestAnimationFrame(() => { frame.srcdoc = html; });
+    requestAnimationFrame(() => {
+      frame.srcdoc = html;
+    });
   });
 
   fullscreenBtn.addEventListener("click", () => {
@@ -29,7 +38,7 @@ export function mountPreview(): PreviewElements {
     }
   });
 
-  return { frame, meta, restartBtn, fullscreenBtn };
+  return { frame, meta, restartBtn, fullscreenBtn, shareBtn };
 }
 
 export function renderGame(
@@ -40,6 +49,16 @@ export function renderGame(
   el.frame.srcdoc = html;
   el.restartBtn.hidden = false;
   el.fullscreenBtn.hidden = false;
+  if (el.shareBtn) el.shareBtn.hidden = false;
+
   const cacheTag = meta.fromCache ? " · из кэша" : "";
   el.meta.textContent = `${meta.genre} · ${meta.audience} · ${meta.provider}${cacheTag}`;
+}
+
+export function clearGame(el: PreviewElements): void {
+  el.frame.srcdoc = "";
+  el.restartBtn.hidden = true;
+  el.fullscreenBtn.hidden = true;
+  if (el.shareBtn) el.shareBtn.hidden = true;
+  el.meta.textContent = "Игра появится здесь";
 }
