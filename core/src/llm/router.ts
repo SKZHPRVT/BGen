@@ -5,6 +5,7 @@ import { ManualProvider } from "./providers/manual.ts";
 import { OllamaProvider } from "./providers/ollama.ts";
 import { AnthropicProvider } from "./providers/anthropic.ts";
 import { OpenAIProvider } from "./providers/openai.ts";
+import { GigaChatProvider } from "./providers/gigachat.ts";
 import { MockProvider } from "./providers/mock.ts";
 
 export interface RouterOptions {
@@ -33,10 +34,14 @@ export class Router {
     this.onAttempt = opts.onAttempt;
   }
 
-  available(): string[] { return this.providers.map((p) => p.name); }
+  available(): string[] {
+    return this.providers.map((p) => p.name);
+  }
 
   async generate(req: LLMRequest, onChunk?: (t: string) => void): Promise<RouterResult> {
-    if (this.providers.length === 0) throw new Error("No LLM providers available.");
+    if (this.providers.length === 0) {
+      throw new Error("No LLM providers available.");
+    }
     const errors: string[] = [];
     let totalAttempts = 0;
 
@@ -45,9 +50,8 @@ export class Router {
         totalAttempts++;
         try {
           this.onAttempt?.({ provider: p.name, attempt: totalAttempts });
-          const task = onChunk && p.generateStream
-            ? p.generateStream(req, onChunk)
-            : p.generate(req);
+          const task =
+            onChunk && p.generateStream ? p.generateStream(req, onChunk) : p.generate(req);
           const text = await withTimeout(task, this.timeoutMs, `Provider ${p.name} timeout`);
           if (!text || text.trim().length < 50) throw new Error("Response too short");
           return { text, provider: p.name, attempts: totalAttempts };
@@ -64,14 +68,17 @@ export class Router {
 }
 
 export function createDefaultRouter(opts: Partial<RouterOptions> = {}): Router {
-  const order = (process.env.LLM_PROVIDER_ORDER ?? "manual,ollama,anthropic,openai")
-    .split(",").map((s) => s.trim()).filter(Boolean);
+  const order = (process.env.LLM_PROVIDER_ORDER ?? "manual,ollama,anthropic,openai,gigachat")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const factory: Record<string, () => LLMProvider> = {
     manual: () => new ManualProvider(),
     ollama: () => new OllamaProvider(),
     anthropic: () => new AnthropicProvider(),
     openai: () => new OpenAIProvider(),
+    gigachat: () => new GigaChatProvider(),
     mock: () => new MockProvider(),
   };
 
