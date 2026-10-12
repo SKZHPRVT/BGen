@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "description": "Корпус эталонных игр для few-shot retrieval",
+  "genres": ["snake", "clicker", "platformer", "puzzle", "runner", "memory", "shooter", "breakout", "2048", "tower"],
+  "audiences": ["default", "elderly", "kids", "hardcore"]
+}
