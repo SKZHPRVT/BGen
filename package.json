@@ -1,11 +1,14 @@
 {
   "name": "bgen",
+  "version": "0.1.0",
   "private": true,
   "workspaces": ["core", "server", "app", "tools"],
   "scripts": {
     "dev": "bash scripts/dev.sh",
     "build": "bash scripts/build.sh",
-    "test": "bun test core/tests"
+    "test": "bun test core/tests",
+    "typecheck": "tsc -p tsconfig.base.json --noEmit",
+    "clean": "rm -rf node_modules */node_modules */dist"
   },
   "devDependencies": {
     "typescript": "^5.5.0",
