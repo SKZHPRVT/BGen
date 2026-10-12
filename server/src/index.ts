@@ -45,11 +45,19 @@ app.onError((err, c) => {
   return c.json({ error: "Internal server error", message: err.message }, 500);
 });
 
-logger.info(`BGen server starting on http://${config.host}:${config.port}`);
+// ─────────────────────────────────────────────────────────────
+// Railway / Production binding
+// ─────────────────────────────────────────────────────────────
+// Railway передаёт свой $PORT — обязательно слушаем 0.0.0.0,
+// иначе снаружи контейнера к серверу не достучаться.
+const port = Number(process.env.PORT ?? config.port ?? 3000);
+const hostname = "0.0.0.0";
+
+logger.info(`BGen server starting on http://${hostname}:${port}`);
 logger.info(`Telegram auth: ${config.telegramBotToken ? "ENABLED" : "disabled (dev mode)"}`);
 
 export default {
-  port: config.port,
-  hostname: config.host,
+  port,
+  hostname,
   fetch: app.fetch,
 };

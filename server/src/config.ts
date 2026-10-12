@@ -9,3 +9,6 @@ export const config = {
     maxRequests: Number(process.env.RATE_LIMIT_MAX ?? 20),
   },
 } as const;
+
+// Для Railway: логируем, чтобы видеть в Deploy Logs, что подхватили
+console.log(`[BGen/config] PORT=${config.port} HOST=${config.host} ENV=${config.env}`);
