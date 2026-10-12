@@ -1,3 +1,9 @@
+import { tg } from "./tg.ts";
+
+// В dev-режиме: пусто → Vite проксирует /api на localhost:3000
+// В проде (Pages): абсолютный URL до сервера, задаётся через VITE_API_URL
+const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+
 export interface GenerateRequest {
   prompt: string;
   audience?: string;
@@ -30,10 +36,18 @@ export class ApiError extends Error {
   }
 }
 
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  const initData = tg?.initData;
+  if (initData) headers["X-Telegram-Init-Data"] = initData;
+  return headers;
+}
+
 async function postJSON<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(path, {
+  const url = `${API_BASE}${path}`;
+  const res = await fetch(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: authHeaders(),
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -52,7 +66,7 @@ export async function iterate(req: GenerateRequest): Promise<GenerateResponse> {
 }
 
 export async function health(): Promise<{ status: string; uptime: number }> {
-  const res = await fetch("/api/health");
+  const res = await fetch(`${API_BASE}/api/health`);
   if (!res.ok) throw new ApiError("Health check failed", res.status);
   return res.json();
 }

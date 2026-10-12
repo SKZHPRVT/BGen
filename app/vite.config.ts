@@ -1,6 +1,11 @@
 import { defineConfig } from "vite";
 
+// GitHub Pages хостит проект по подпути /BGen/.
+// В dev-режиме (vite) — корень /.
+const isPages = process.env.GITHUB_PAGES === "1";
+
 export default defineConfig({
+  base: isPages ? "/BGen/" : "/",
   server: {
     port: 5173,
     host: true,
@@ -15,5 +20,6 @@ export default defineConfig({
     target: "es2022",
     outDir: "dist",
     sourcemap: false,
+    emptyOutDir: true,
   },
 });
