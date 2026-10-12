@@ -2,7 +2,7 @@
   "name": "bgen",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["core", "server", "app", "tools"],
+  "workspaces": ["core"],
   "scripts": {
     "dev": "bash scripts/dev.sh",
     "build": "bash scripts/build.sh",
