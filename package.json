@@ -2,8 +2,10 @@
   "name": "bgen",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["core"],
+  "workspaces": ["core", "server"],
   "scripts": {
+    "dev:core": "bun --watch core/src/index.ts --noop",
+    "dev:server": "cd server && bun --watch src/index.ts",
     "dev": "bash scripts/dev.sh",
     "build": "bash scripts/build.sh",
     "test": "bun test core/tests",
