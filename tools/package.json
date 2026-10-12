@@ -1,0 +1,15 @@
+{
+  "name": "@bgen/tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test-prompts": "bun run src/test-prompts.ts",
+    "bench": "bun run src/bench.ts",
+    "gen-corpus": "bun run src/gen-corpus.ts",
+    "seed-manual": "bun run src/seed-manual.ts"
+  },
+  "dependencies": {
+    "@bgen/core": "workspace:*"
+  }
+}

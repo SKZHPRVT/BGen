@@ -1,21 +1,53 @@
 #!/usr/bin/env bash
+# BGen — запуск dev-стека
+# Поднимает server + app одновременно.
 set -e
+
 cd "$(dirname "$0")/.."
 
-echo "▶ Starting BGen dev stack..."
+echo "▶ BGen dev stack starting..."
 echo ""
 
-# core — watch typecheck
-bun --watch core/src/index.ts --noop 2>/dev/null &
-CORE_PID=$!
+# Проверки
+if ! command -v bun >/dev/null 2>&1; then
+  echo "❌ bun не найден. Установи: curl -fsSL https://bun.sh/install | bash"
+  exit 1
+fi
 
-# server
-(cd server && bun --watch src/index.ts) &
+if [ ! -f .env ]; then
+  echo "⚠️  .env не найден. Копирую из .env.example..."
+  cp .env.example .env 2>/dev/null || true
+fi
+
+# Mock-режим если не задан провайдер
+USE_MOCK="${BGEN_USE_MOCK:-1}"
+
+echo "   Mode:      $([ "$USE_MOCK" = "1" ] && echo "MOCK (без сети)" || echo "LIVE LLM")"
+echo "   Server:    http://localhost:3000"
+echo "   App:       http://localhost:5173"
+echo ""
+
+# Server в фоне
+(
+  cd server
+  BGEN_USE_MOCK="$USE_MOCK" bun --watch src/index.ts
+) &
 SERVER_PID=$!
 
-# app
-(cd app && bunx vite) &
+# App
+(
+  cd app
+  bunx vite
+) &
 APP_PID=$!
 
-trap "kill $CORE_PID $SERVER_PID $APP_PID 2>/dev/null || true" EXIT
+cleanup() {
+  echo ""
+  echo "▶ Останавливаю..."
+  kill "$SERVER_PID" "$APP_PID" 2>/dev/null || true
+  wait 2>/dev/null || true
+  echo "✔ Остановлено."
+}
+trap cleanup EXIT INT TERM
+
 wait

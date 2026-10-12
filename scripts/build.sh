@@ -1,10 +1,29 @@
 #!/usr/bin/env bash
+# BGen — production build
 set -e
+
 cd "$(dirname "$0")/.."
 
-echo "▶ Building BGen..."
-(cd app && bunx vite build)
-echo "✔ app built"
+echo "▶ BGen build"
 echo ""
-echo "Server runs directly via bun (no build step)."
-echo "Core is consumed as TS source via workspaces."
+
+# App
+echo "→ Building app..."
+(cd app && bunx vite build)
+echo "  ✔ app/dist готов"
+echo ""
+
+# Server (bun не требует сборки — TS из коробки)
+echo "→ Server: сборка не требуется (bun запускает TS напрямую)."
+echo ""
+
+# Проверка типов core
+echo "→ Typecheck core..."
+(cd core && bunx tsc --noEmit) || echo "  ⚠️  typecheck core упал (не критично для демо)"
+echo ""
+
+echo "✔ Build завершён."
+echo ""
+echo "Деплой:"
+echo "  - app/dist  → любой static host (Vercel, Netlify, Cloudflare Pages)"
+echo "  - server/   → bun server/src/index.ts (Railway, Fly.io, VPS)"
