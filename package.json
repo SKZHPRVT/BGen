@@ -1,0 +1,14 @@
+{
+  "name": "bgen",
+  "private": true,
+  "workspaces": ["core", "server", "app", "tools"],
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "build": "bash scripts/build.sh",
+    "test": "bun test core/tests"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/bun": "latest"
+  }
+}
