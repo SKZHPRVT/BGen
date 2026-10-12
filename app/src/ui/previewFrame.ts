@@ -1,6 +1,6 @@
 /**
  * Превью-фрейм: iframe с srcdoc, куда вставляется HTML игры.
- * Плюс кнопки restart / fullscreen / share.
+ * Плюс кнопки export / share / restart / fullscreen.
  */
 
 export interface PreviewElements {
@@ -9,6 +9,7 @@ export interface PreviewElements {
   restartBtn: HTMLButtonElement;
   fullscreenBtn: HTMLButtonElement;
   shareBtn: HTMLButtonElement | null;
+  exportBtn: HTMLButtonElement | null;
 }
 
 export function mountPreview(): PreviewElements {
@@ -17,6 +18,7 @@ export function mountPreview(): PreviewElements {
   const restartBtn = document.getElementById("restartBtn") as HTMLButtonElement;
   const fullscreenBtn = document.getElementById("fullscreenBtn") as HTMLButtonElement;
   const shareBtn = document.getElementById("shareBtn") as HTMLButtonElement | null;
+  const exportBtn = document.getElementById("exportBtn") as HTMLButtonElement | null;
 
   if (!frame || !meta || !restartBtn || !fullscreenBtn) {
     throw new Error("Preview: missing DOM elements");
@@ -38,7 +40,7 @@ export function mountPreview(): PreviewElements {
     }
   });
 
-  return { frame, meta, restartBtn, fullscreenBtn, shareBtn };
+  return { frame, meta, restartBtn, fullscreenBtn, shareBtn, exportBtn };
 }
 
 export function renderGame(
@@ -50,6 +52,7 @@ export function renderGame(
   el.restartBtn.hidden = false;
   el.fullscreenBtn.hidden = false;
   if (el.shareBtn) el.shareBtn.hidden = false;
+  if (el.exportBtn) el.exportBtn.hidden = false;
 
   const cacheTag = meta.fromCache ? " · из кэша" : "";
   el.meta.textContent = `${meta.genre} · ${meta.audience} · ${meta.provider}${cacheTag}`;
@@ -60,5 +63,6 @@ export function clearGame(el: PreviewElements): void {
   el.restartBtn.hidden = true;
   el.fullscreenBtn.hidden = true;
   if (el.shareBtn) el.shareBtn.hidden = true;
+  if (el.exportBtn) el.exportBtn.hidden = true;
   el.meta.textContent = "Игра появится здесь";
 }

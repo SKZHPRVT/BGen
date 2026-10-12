@@ -8,6 +8,7 @@ import { mountPreview, renderGame } from "./ui/previewFrame.ts";
 import { mountIteration, showIteration, setIterationLoading } from "./ui/iterationBar.ts";
 import { mountGallery, renderGallery } from "./ui/gallery.ts";
 import { shareGame } from "./ui/share.ts";
+import { exportGame } from "./ui/export.ts";
 
 initPlatform();
 
@@ -148,7 +149,22 @@ async function onShare(): Promise<void> {
   }
 }
 
-// Монтирование обработчиков
+async function onExport(): Promise<void> {
+  if (!lastGame) return;
+  const res = await exportGame(lastGame);
+  if (res.ok) {
+    store.set({
+      status: res.message ?? `Файл ${res.filename} сохранён`,
+      statusType: "success",
+    });
+  } else {
+    store.set({
+      status: res.message ?? "Не удалось экспортировать",
+      statusType: "error",
+    });
+  }
+}
+
 promptEl.generateBtn.addEventListener("click", onGenerate);
 iterationEl.button.addEventListener("click", onIterate);
 
@@ -166,11 +182,12 @@ iterationEl.input.addEventListener("keydown", (e) => {
   }
 });
 
-// Кнопка Share — привяжется, если есть в DOM
 const shareBtn = document.getElementById("shareBtn");
 if (shareBtn) shareBtn.addEventListener("click", onShare);
 
-// Финальный boot — грузим историю и подписываемся на неё
+const exportBtn = document.getElementById("exportBtn");
+if (exportBtn) exportBtn.addEventListener("click", onExport);
+
 (async () => {
   await store.load();
   console.log(`[BGen] Ready in ${platform.kind} mode`);

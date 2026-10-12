@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>BGen — WebView Test</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, system-ui, monospace; }
+    #wrap { display: flex; flex-direction: column; height: 100%; }
+    #info { padding: 12px 16px; background: #1a1a1a; font-size: 12px; line-height: 1.5; border-bottom: 1px solid #333; overflow-y: auto; max-height: 40vh; }
+    #info h1 { margin: 0 0 8px; font-size: 16px; }
+    #info b { color: #4f8; }
+    #info .k { color: #888; }
+    #frame { flex: 1; border: 0; width: 100%; background: #000; }
+    #inputRow { display: flex; gap: 8px; padding: 8px; background: #1a1a1a; }
+    #urlInput { flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #333; background: #000; color: #eee; font-family: inherit; font-size: 13px; }
+    button { padding: 8px 14px; border-radius: 6px; border: none; background: #2a6; color: #fff; font-weight: bold; cursor: pointer; font-family: inherit; }
+    button:active { transform: scale(0.97); }
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <div id="info">
+    <h1>🧪 BGen WebView Test</h1>
+    <div id="env"></div>
+    <div style="margin-top:8px;font-size:11px;color:#888">
+      Эта страница проверяет, что сгенерированные BGen-игры работают
+      в любом WebView без Telegram, без CDN, без серверных зависимостей.
+    </div>
+  </div>
+  <div id="inputRow">
+    <input id="urlInput" type="text" placeholder="вставь URL или data:URL игры" value="./">
+    <button id="loadBtn">Открыть</button>
+  </div>
+  <iframe id="frame" sandbox="allow-scripts allow-pointer-lock allow-same-origin"></iframe>
+</div>
+<script>
+(function() {
+  // Собираем данные о среде
+  const ua = navigator.userAgent;
+  const uaData = navigator.userAgentData || {};
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  const dpr = window.devicePixelRatio || 1;
+  const hasTouch = 'ontouchstart' in window || (navigator.maxTouchPoints > 0);
+  const inIframe = (() => { try { return window.self !== window.top; } catch { return true; } })();
+
+  const checks = [
+    ['WebView/браузер', ua.match(/(Chrome|Firefox|Safari|WebView|Edg)\/?[\d.]*/)?.[0] || ua.slice(0, 60)],
+    ['Платформа', (uaData.platform || navigator.platform || 'unknown')],
+    ['Мобильный', uaData.mobile ?? /Android|iPhone|iPad|Mobile/i.test(ua)],
+    ['В iframe', inIframe],
+    ['Размер окна', `${w}×${h}`],
+    ['Device Pixel Ratio', dpr],
+    ['Touch', hasTouch],
+    ['Canvas 2D', (() => { try { return !!document.createElement('canvas').getContext('2d'); } catch { return false; } })()],
+    ['Web Audio', typeof AudioContext !== 'undefined' || typeof (window).webkitAudioContext !== 'undefined'],
+    ['requestAnimationFrame', typeof requestAnimationFrame === 'function'],
+    ['localStorage', (() => { try { localStorage.setItem('t','1'); localStorage.removeItem('t'); return true; } catch { return false; } })()],
+    ['Telegram SDK', typeof window.Telegram?.WebApp?.initData === 'string' ? 'подключён' : 'нет'],
+  ];
+
+  const env = document.getElementById('env');
+  env.innerHTML = checks.map(([k, v]) => `<div><span class="k">${k}:</span> <b>${String(v)}</b></div>`).join('');
+
+  // Логика загрузки
+  const frame = document.getElementById('frame');
+  const urlInput = document.getElementById('urlInput');
+  const loadBtn = document.getElementById('loadBtn');
+
+  function load() {
+    const url = urlInput.value.trim();
+    if (!url) return;
+    // data:URL и blob:URL через srcdoc не работают — используем src
+    frame.src = url;
+  }
+
+  loadBtn.addEventListener('click', load);
+  urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+
+  // Автозагрузка: если передан ?game=URL
+  const params = new URLSearchParams(location.search);
+  const initial = params.get('game');
+  if (initial) {
+    urlInput.value = initial;
+    load();
+  } else if (location.protocol !== 'file:') {
+    // Ничего не грузим — пользователь сам вставит URL игры
+  }
+
+  // Логирование событий iframe (для отладки)
+  frame.addEventListener('load', () => {
+    console.log('[WebView Test] game loaded');
+  });
+
+  console.log('[WebView Test] ready', { ua, w, h, dpr });
+})();
+</script>
+</body>
+</html>
