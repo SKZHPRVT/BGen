@@ -40,7 +40,7 @@ html, body {
 body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 
 /* ============================================ */
-/* Прелоадер                                     */
+/* ПРЕЛОАДЕР                                     */
 /* ============================================ */
 
 .preloader {
@@ -51,7 +51,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  transition: opacity 0.4s ease-out;
+  transition: opacity 0.5s ease-out;
 }
 
 .preloader.fade-out {
@@ -63,18 +63,34 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 32px;
+  justify-content: center;
+  gap: 36px;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
 }
 
+/* Пиксельный шарик */
+.bee-ball {
+  display: block;
+  width: min(60vw, 280px);
+  height: min(60vw, 280px);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Строка [BE......] */
 .bee-bar {
   display: flex;
   align-items: center;
-  gap: 0;
-  font-family: "SF Mono", "Menlo", "Consolas", monospace;
-  font-size: 42px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+  justify-content: center;
+  gap: 8px;
+  font-family: "SF Mono", "Menlo", "Consolas", "Courier New", monospace;
+  font-size: clamp(36px, 10vw, 52px);
+  font-weight: 900;
+  letter-spacing: 0.02em;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .bee-bracket {
@@ -84,41 +100,39 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 
 .bee-letters {
   display: inline-block;
-  min-width: 280px;
+  min-width: 8ch;
   text-align: center;
   white-space: pre;
   font-variant-numeric: tabular-nums;
 }
 
-/* Каждая буква внутри .bee-letters — span */
-.bee-letters .yellow { color: #ffdd00; }
-.bee-letters .black  { color: #000000; }
+.bee-letters .bee-yellow { color: #ffdd00; }
+.bee-letters .bee-black  { color: #000000; }
+.bee-letters .bee-dot    { color: #cccccc; }
 
-.bee-ball {
-  display: block;
-  width: 240px;
-  height: 240px;
-}
-
+/* GEN появляется внизу на всю ширину скобок */
 .bee-gen {
-  font-family: "SF Mono", "Menlo", "Consolas", monospace;
-  font-size: 56px;
+  font-family: "SF Mono", "Menlo", "Consolas", "Courier New", monospace;
+  font-size: clamp(40px, 12vw, 64px);
   font-weight: 900;
-  letter-spacing: 0.35em;
+  letter-spacing: 0.5em;
+  padding-left: 0.5em; /* компенсация letter-spacing */
   color: #000000;
   text-align: center;
+  width: 100%;
   opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  transform: translateY(12px) scale(0.95);
+  transition: opacity 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+              transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 
 .bee-gen.show {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) scale(1);
 }
 
 /* ============================================ */
-/* Основное приложение                           */
+/* ОСНОВНОЕ ПРИЛОЖЕНИЕ                           */
 /* ============================================ */
 
 .app-root {
@@ -298,6 +312,3 @@ body.is-telegram .bgen-frame {
   .bgen-row { flex-direction: column; }
   body.is-telegram .bgen-frame { height: calc(var(--tg-viewport-height) * 0.58); }
 }
-
-/* Скрываем стандартный скроллбар прелоадера */
-.preloader canvas { image-rendering: pixelated; }

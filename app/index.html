@@ -12,21 +12,22 @@
 </head>
 <body>
   <!-- ============================================ -->
-  <!-- ПРЕЛОАДЕР: показывается при открытии          -->
+  <!-- ПРЕЛОАДЕР                                     -->
+  <!-- Шарик по центру → строка [BE......] → GEN     -->
   <!-- ============================================ -->
   <div id="preloader" class="preloader">
     <div class="preloader-content">
+      <!-- Пиксельный шарик BeeLine -->
+      <canvas id="bee-ball" class="bee-ball" width="480" height="480"></canvas>
+
       <!-- [BE......] — прогресс-бар буквами -->
       <div class="bee-bar">
         <span class="bee-bracket">[</span>
-        <span id="bee-letters" class="bee-letters">BE······</span>
+        <span id="bee-letters" class="bee-letters"></span>
         <span class="bee-bracket">]</span>
       </div>
 
-      <!-- Пиксельный шарик, собирается из хаоса -->
-      <canvas id="bee-ball" class="bee-ball" width="240" height="240"></canvas>
-
-      <!-- GEN появляется внизу -->
+      <!-- GEN — появляется внизу после загрузки -->
       <div id="bee-gen" class="bee-gen"></div>
     </div>
   </div>
