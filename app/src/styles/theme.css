@@ -89,13 +89,13 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   image-rendering: crisp-edges;
 }
 
-/* Обёртка для [BE......] + GEN, чтобы они были одной ширины */
+/* Обёртка для [BE......] + GEN — одной ширины */
 .bee-block {
   display: flex;
   flex-direction: column;
   align-items: center;
   width: 100%;
-  gap: 12px;
+  gap: 10px;
 }
 
 /* Строка [BE......] */
@@ -130,13 +130,17 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 .bee-letters .bee-black  { color: #000000; }
 .bee-letters .bee-dot    { color: #cccccc; }
 
-/* GEN — три буквы: G к левой скобке, E по центру, N к правой.
-   Растягиваем через flex space-between на всю ширину [BE......]. */
+/* GEN — три буквы растянуты по всей ширине между скобками.
+   padding-left/right компенсируют ширину скобок + gap от .bee-bar,
+   поэтому G встаёт под левой [, E по центру, N под правой ].
+   Значение подобрано эмпирически: скобка ≈ 0.6em, gap ≈ 6px. */
 .bee-gen {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  padding-left: calc(0.6em + 6px);
+  padding-right: calc(0.6em + 6px);
   font-family: var(--font-mono);
   font-size: clamp(38px, 11vw, 56px);
   font-weight: 900;
