@@ -5,13 +5,13 @@
  * ВАЖНО: проверки init-state ищут ТОЛЬКО объявление переменной
  * (`let state = "..."`, `var state = "..."`, `const state = "..."`),
  * а не любое упоминание (например, `if (state === "gameover")`).
- * Это устраняет ложные срабатывания на проверках состояния.
  */
 import type { InvariantIssue } from "../types.ts";
 import type { MiniAst } from "./miniAst.ts";
 
 export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   const issues: InvariantIssue[] = [];
+  const html = ast.raw;
 
   // Игровой цикл — критично
   if (!ast.hasRequestAnimationFrame && !ast.hasSetInterval) {
@@ -34,7 +34,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     });
   }
 
-  // Мобильное управление — критично для TMA
+  // Мобильное управление
   if (!ast.hasTouch) {
     issues.push({
       id: "no-touch",
@@ -74,7 +74,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     });
   }
 
-  // Ресайз — важно для WebView
+  // Ресайз
   if (!ast.hasResize) {
     issues.push({
       id: "no-resize",
@@ -94,7 +94,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     });
   }
 
-  // Score — почти всегда нужен
+  // Score
   if (!ast.hasScore) {
     issues.push({
       id: "no-score",
@@ -105,10 +105,10 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // КРИТИЧНО: игра не должна стартовать в состоянии проигрыша.
-  // Ловим ТОЛЬКО инициализацию через let/var/const — не проверки if.
+  // Игра не должна стартовать в состоянии проигрыша/победы
+  // (только инициализация через let/var/const)
   // ─────────────────────────────────────────────────────────────
-  const head = ast.raw.slice(0, 4000);
+  const head = html.slice(0, 4000);
 
   const startsInGameover =
     /(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](gameover|game_over|game-over|lose|lost|dead|defeat)['"`]/i.test(
@@ -122,15 +122,10 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
       message: "Игра инициализируется в состоянии проигрыша",
       hint:
         "Начальное состояние должно быть 'start' или 'playing'. " +
-        "Gameover — только после реального проигрыша. " +
-        "Не забудь показать экран старта или сразу начать игру.",
+        "Gameover — только после реального проигрыша.",
     });
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // КРИТИЧНО: игра не должна сразу выставлять win.
-  // Тоже только инициализация.
-  // ─────────────────────────────────────────────────────────────
   const startsInWin =
     /(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](win|won|victory|finished)['"`]/i.test(
       head,
@@ -141,9 +136,55 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
       id: "starts-in-win",
       severity: "error",
       message: "Игра инициализируется в состоянии победы",
+      hint: "Начальное состояние должно быть 'start' или 'playing'.",
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // ФУНКЦИЯ-ОБРАБОТЧИК ВЫЗЫВАЕТСЯ БЕЗ EVENT
+  // ─────────────────────────────────────────────────────────────
+  // Ищем объявление функции, которая использует event.key / event.touches /
+  // event.clientX, но при этом где-то вызывается без аргумента: name().
+  const handlerNames = [
+    ...html.matchAll(
+      /function\s+(\w*(?:Handle|Input|Key|Touch|Click|Tap|Press)\w*)\s*\(\s*(\w+)\s*\)\s*\{([^}]{0,500})/gi,
+    ),
+  ]
+    .filter((m) => /\b\w+\.(key|touches|clientX|clientY|type)\b/.test(m[3] ?? ""))
+    .map((m) => m[1]);
+
+  for (const name of new Set(handlerNames)) {
+    const badCall = new RegExp(`\\b${name}\\s*\\(\\s*\\)`, "i").test(html);
+    if (badCall) {
+      issues.push({
+        id: "handler-called-without-event",
+        severity: "error",
+        message: `Обработчик ${name}() вызывается без event`,
+        hint:
+          `Функция ${name} использует event.key / event.touches и должна ` +
+          `вызываться ТОЛЬКО из addEventListener('keydown'|'touchstart'|...) ` +
+          `с event аргументом. Убери прямой вызов ${name}() и добавь addEventListener.`,
+      });
+      break; // одного раза достаточно
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // EVENT ИСПОЛЬЗУЕТСЯ БЕЗ ПРОВЕРКИ
+  // ─────────────────────────────────────────────────────────────
+  // Если в коде есть event.key / event.touches БЕЗ передачи event в функцию
+  const usesEventKey = /\bevent\.(key|touches|clientX|clientY)\b/i.test(html);
+  const hasKeydownHandler = /addEventListener\s*\(\s*['"`](keydown|touchstart|pointerdown)/i.test(
+    html,
+  );
+  if (usesEventKey && !hasKeydownHandler) {
+    issues.push({
+      id: "event-without-handler",
+      severity: "error",
+      message: "event используется, но нет addEventListener",
       hint:
-        "Начальное состояние должно быть 'start' или 'playing'. " +
-        "Победа — только после достижения условия.",
+        "event.key / event.touches доступны только внутри addEventListener. " +
+        "Добавь addEventListener('keydown', function(event) { if (event.key === ...) ... })",
     });
   }
 
