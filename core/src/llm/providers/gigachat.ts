@@ -1,7 +1,12 @@
 /**
  * GigaChatProvider — Сбер GigaChat API.
- * Не совместим с OpenAI: сначала OAuth-токен, потом чат-запросы.
- * Токен живёт 30 минут, обновляем автоматически.
+ *
+ * Особенности:
+ *   - Не совместим с OpenAI: сначала OAuth-токен, потом чат-запросы.
+ *   - Токен живёт 30 минут, обновляем автоматически.
+ *   - Использует сертификат Минцифры РФ → в Node/Bun даёт "self signed certificate".
+ *     Решение: собственный undici Agent с `rejectUnauthorized: false`
+ *     для домена GigaChat. Шифрование остаётся, только отключается проверка CA.
  *
  * Требует env:
  *   GIGACHAT_AUTH_KEY  — base64(ClientID:ClientSecret)
@@ -26,7 +31,6 @@ export class GigaChatProvider extends BaseProvider {
   private model: string;
   private scope: string;
 
-  // Кэш токена
   private accessToken: string | null = null;
   private tokenExpiresAt = 0;
 
@@ -54,22 +58,29 @@ export class GigaChatProvider extends BaseProvider {
     const rquid = crypto.randomUUID();
     const body = new URLSearchParams({ scope: this.scope });
 
-    const res = await fetch(OAUTH_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-        RqUID: rquid,
-        Authorization: `Basic ${this.authKey}`,
-      },
-      body: body.toString(),
-    });
+    let res: Response;
+    try {
+      res = await fetch(OAUTH_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+          RqUID: rquid,
+          Authorization: `Basic ${this.authKey}`,
+        },
+        body: body.toString(),
+        // @ts-ignore — Bun/Node поддерживают tls-опции
+        tls: { rejectUnauthorized: false },
+      });
+    } catch (e) {
+      throw new ProviderError(this.name, `OAuth fetch failed: ${(e as Error).message}`);
+    }
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new ProviderError(
         this.name,
-        `OAuth failed: HTTP ${res.status} ${text.slice(0, 200)}`,
+        `OAuth HTTP ${res.status}: ${text.slice(0, 200)}`,
       );
     }
 
@@ -96,6 +107,8 @@ export class GigaChatProvider extends BaseProvider {
           Accept: "application/json",
         },
         signal: req.signal,
+        // @ts-ignore
+        tls: { rejectUnauthorized: false },
         body: JSON.stringify({
           model: this.model,
           messages,
