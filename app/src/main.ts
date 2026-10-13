@@ -3,7 +3,11 @@ import { initPlatform, haptic } from "./tg.ts";
 import { platform } from "./platform.ts";
 import { generate, iterate, ApiError } from "./api.ts";
 import { store, type GameRecord } from "./state/store.ts";
-import { showPreloader, hidePreloader } from "./ui/preloader.ts";
+import {
+  runBootPreloader,
+  showLoadingPreloader,
+  hideLoadingPreloader,
+} from "./ui/preloader.ts";
 import { mountSettings, type SettingsElements } from "./ui/settingsModal.ts";
 import { shareGame } from "./ui/share.ts";
 import { exportGame } from "./ui/export.ts";
@@ -11,7 +15,7 @@ import { exportGame } from "./ui/export.ts";
 initPlatform();
 
 // =============================================================
-// Экраны
+// DOM
 // =============================================================
 
 const screenStart = document.getElementById("screen-start")!;
@@ -30,6 +34,10 @@ const gamesList = document.getElementById("gamesList")!;
 const gamesClose = document.getElementById("gamesClose") as HTMLButtonElement;
 const gamesNewBtn = document.getElementById("gamesNewBtn") as HTMLButtonElement;
 const gamesBackdrop = gamesModal.querySelector(".modal-backdrop") as HTMLDivElement;
+
+// =============================================================
+// Экраны
+// =============================================================
 
 function showScreen(name: "start" | "game"): void {
   if (name === "start") {
@@ -84,8 +92,8 @@ startBtn.addEventListener("click", async () => {
   haptic("medium");
   hideStartStatus();
 
-  // Показываем прелоадер
-  showPreloader();
+  // Прелоадер генерации
+  showLoadingPreloader();
 
   try {
     const res = await generate({
@@ -106,13 +114,11 @@ startBtn.addEventListener("click", async () => {
 
     await store.addGame(game);
     lastGame = game;
-
-    // Показываем игру
     renderGame(game);
 
     // Даём прелоадеру красивую паузу
-    await sleep(800);
-    hidePreloader();
+    await sleep(600);
+    hideLoadingPreloader();
     showScreen("game");
 
     if (settingsEl) {
@@ -122,7 +128,7 @@ startBtn.addEventListener("click", async () => {
     haptic("success");
   } catch (e) {
     haptic("error");
-    hidePreloader();
+    hideLoadingPreloader();
     showScreen("start");
     const msg = e instanceof ApiError ? e.message : (e as Error).message;
     showStartStatus(`Ошибка: ${msg}`, "error");
@@ -232,7 +238,7 @@ async function onIterate(newPrompt: string): Promise<void> {
 
   haptic("medium");
   settingsEl?.close();
-  showPreloader();
+  showLoadingPreloader();
 
   try {
     const res = await iterate({
@@ -256,8 +262,8 @@ async function onIterate(newPrompt: string): Promise<void> {
     lastGame = game;
     renderGame(game);
 
-    await sleep(600);
-    hidePreloader();
+    await sleep(500);
+    hideLoadingPreloader();
     showScreen("game");
 
     if (settingsEl) {
@@ -267,7 +273,7 @@ async function onIterate(newPrompt: string): Promise<void> {
     haptic("success");
   } catch (e) {
     haptic("error");
-    hidePreloader();
+    hideLoadingPreloader();
     showScreen("game");
     console.warn("[iterate] failed", e);
   }
@@ -359,8 +365,8 @@ buildSettings();
   await store.load();
   updateGamesCount();
 
-  // Всегда начинаем со стартового экрана
-  showScreen("start");
+  // Стартовый прелоадер при открытии
+  await runBootPreloader();
 
   console.log(`[BGen] Ready in ${platform.kind} mode`);
 })();

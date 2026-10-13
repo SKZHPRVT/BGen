@@ -19,9 +19,25 @@
 <body>
 
   <!-- =========================================== -->
-  <!-- ЭКРАН 1: СТАРТ                               -->
+  <!-- ЭКРАН 0: СТАРТОВЫЙ ПРЕЛОАДЕР                 -->
   <!-- =========================================== -->
-  <section id="screen-start" class="screen screen-start">
+  <section id="screen-boot" class="screen screen-boot">
+    <canvas id="boot-canvas" class="chaos-canvas"></canvas>
+
+    <div class="boot-content">
+      <div class="boot-bee">
+        <span class="bee-bracket">[</span>
+        <span id="boot-letters" class="bee-letters"></span>
+        <span class="bee-bracket">]</span>
+      </div>
+      <div id="boot-gen" class="boot-gen"></div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- ЭКРАН 1: СТАРТ                                -->
+  <!-- =========================================== -->
+  <section id="screen-start" class="screen screen-start" hidden>
     <div class="screen-inner">
       <h1 class="hero-title">Создай игру</h1>
       <p class="hero-subtitle">Опиши идею — ИИ сделает игру за 30-60 секунд</p>
@@ -97,7 +113,6 @@
       title="Сгенерированная игра"
     ></iframe>
 
-    <!-- Кнопка настроек в правом верхнем углу -->
     <button id="settingsBtn" class="float-settings-btn" title="Настройки">⚙</button>
   </section>
 
@@ -113,10 +128,8 @@
       </div>
 
       <div class="modal-body">
-        <!-- Мета игры -->
         <div class="modal-meta" id="modalMeta">—</div>
 
-        <!-- Итерация -->
         <div class="modal-section">
           <label class="modal-label">🔧 Доработать</label>
           <textarea
@@ -129,7 +142,6 @@
           <button id="iterateBtn" class="modal-btn modal-btn-primary">Доработать</button>
         </div>
 
-        <!-- Действия -->
         <div class="modal-section modal-actions">
           <button id="exportBtn" class="modal-btn">⬇ Скачать .html</button>
           <button id="shareBtn" class="modal-btn">↗ Поделиться</button>
@@ -137,7 +149,6 @@
           <button id="fullscreenBtn" class="modal-btn">⛶ На весь экран</button>
         </div>
 
-        <!-- Новая игра -->
         <div class="modal-section">
           <button id="newGameBtn" class="modal-btn modal-btn-primary">
             ✨ Создать новую игру
