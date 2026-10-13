@@ -1,6 +1,11 @@
 /**
  * Игровые инварианты. Проверяют, что перед нами действительно игра,
  * а не набор div'ов, и что она запускается в играбельном состоянии.
+ *
+ * ВАЖНО: проверки init-state ищут ТОЛЬКО объявление переменной
+ * (`let state = "..."`, `var state = "..."`, `const state = "..."`),
+ * а не любое упоминание (например, `if (state === "gameover")`).
+ * Это устраняет ложные срабатывания на проверках состояния.
  */
 import type { InvariantIssue } from "../types.ts";
 import type { MiniAst } from "./miniAst.ts";
@@ -84,8 +89,8 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     issues.push({
       id: "no-viewport",
       severity: "warning",
-      message: "Нет <meta name=\"viewport\">",
-      hint: "Добавь в <head> meta viewport с width=device-width,initial-scale=1.",
+      message: 'Нет meta name="viewport"',
+      hint: "Добавь в head meta viewport с width=device-width,initial-scale=1.",
     });
   }
 
@@ -100,13 +105,13 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // КРИТИЧНО: игра не должна стартовать в состоянии проигрыша
+  // КРИТИЧНО: игра не должна стартовать в состоянии проигрыша.
+  // Ловим ТОЛЬКО инициализацию через let/var/const — не проверки if.
   // ─────────────────────────────────────────────────────────────
-  // Ищем объявление состояния в первых 2000 символах скрипта:
-  // state = 'gameover' / gameState: 'lose' / mode = 'dead' и т.п.
   const head = ast.raw.slice(0, 4000);
+
   const startsInGameover =
-    /(?:state|phase|mode|gameState|game_state)\s*[:=]\s*['"`](gameover|game_over|game-over|lose|lost|dead|defeat)['"`]/i.test(
+    /(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](gameover|game_over|game-over|lose|lost|dead|defeat)['"`]/i.test(
       head,
     );
 
@@ -123,10 +128,11 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // КРИТИЧНО: игра не должна сразу выставлять win
+  // КРИТИЧНО: игра не должна сразу выставлять win.
+  // Тоже только инициализация.
   // ─────────────────────────────────────────────────────────────
   const startsInWin =
-    /(?:state|phase|mode|gameState|game_state)\s*[:=]\s*['"`](win|won|victory|finished)['"`]/i.test(
+    /(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](win|won|victory|finished)['"`]/i.test(
       head,
     );
 
