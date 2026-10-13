@@ -1,5 +1,6 @@
 /**
  * Шаблон «Memory» — найди пары.
+ * Открытые карточки — белый фон, яркая рамка. Совпавшие — фон primary.
  */
 import type { GameConfig } from "../types.ts";
 import { backgroundRuntime, backgroundCSS, audioRuntime } from "../render/index.ts";
@@ -75,32 +76,39 @@ export function buildMemoryGame(cfg: GameConfig): string {
     justify-content: center;
     font-size: ${Math.max(fontSize + 20, 40)}px;
     cursor: pointer;
-    transition: transform 0.15s, background 0.2s, border-color 0.2s;
+    transition: transform 0.15s, background 0.2s;
     -webkit-tap-highlight-color: transparent;
     color: transparent;
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    position: relative;
   }
-  .card:not(.matched):not(.open)::after {
+  .card:not(.open):not(.matched)::before {
     content: '?';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: ${colors.primary};
-    font-size: ${Math.max(fontSize + 4, 26)}px;
+    font-size: ${Math.max(fontSize + 8, 32)}px;
     font-weight: 800;
-    opacity: 0.6;
+    opacity: 0.7;
   }
   .card.open {
     background: #ffffff;
-    border-color: ${colors.primary};
-    transform: scale(1.05);
     color: #000;
+    transform: scale(1.05);
+    border-color: ${colors.accent};
   }
+  .card.open::before { content: ''; }
   .card.matched {
     background: ${colors.primary};
-    border-color: ${colors.primary};
-    color: #fff;
-    opacity: 0.7;
+    color: #ffffff;
+    opacity: 0.85;
     cursor: default;
+    border-color: ${colors.primary};
   }
-  .card.matched::after { content: ''; }
+  .card.matched::before { content: ''; }
   #overlay {
     position: fixed; inset: 0;
     display: none;

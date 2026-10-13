@@ -1,6 +1,6 @@
 /**
  * Шаблон «Змейка».
- * Использует общие runtime для фона, спрайтов, звуков.
+ * Полная поддержка эмодзи: голова, тело, еда.
  */
 import type { GameConfig } from "../types.ts";
 import { backgroundRuntime, backgroundCSS, spritesRuntime, audioRuntime } from "../render/index.ts";
@@ -16,12 +16,10 @@ export function buildSnakeGame(cfg: GameConfig): string {
   const restartButton = texts?.restartButton ?? "Заново";
   const scorePrefix = texts?.scorePrefix ?? "Счёт";
 
-  // Runtime-фрагменты
   const bgRuntime = backgroundRuntime();
   const sprRuntime = spritesRuntime();
   const audRuntime = audioRuntime();
 
-  // Конфиг для JS
   const runtimeConfig = {
     speed,
     gridSize,
@@ -63,11 +61,12 @@ export function buildSnakeGame(cfg: GameConfig): string {
     font-size: ${Math.max(fontSize, 20)}px;
     font-weight: 700;
     color: ${colors.text};
-    background: rgba(0,0,0,0.4);
-    padding: 8px 20px;
+    background: ${colors.surface};
+    padding: 8px 22px;
     border-radius: 14px;
     z-index: 10;
     pointer-events: none;
+    border: 2px solid ${colors.primary};
   }
   #controls {
     position: fixed;
@@ -82,9 +81,9 @@ export function buildSnakeGame(cfg: GameConfig): string {
     width: ${buttonSize}px;
     height: ${buttonSize}px;
     border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.3);
-    background: rgba(255,255,255,0.15);
-    color: #fff;
+    border: 2px solid ${colors.primary};
+    background: ${colors.surface};
+    color: ${colors.text};
     font-size: ${Math.round(buttonSize * 0.45)}px;
     font-weight: bold;
     touch-action: manipulation;
@@ -95,10 +94,11 @@ export function buildSnakeGame(cfg: GameConfig): string {
     justify-content: center;
     padding: 0;
     -webkit-tap-highlight-color: transparent;
-    backdrop-filter: blur(6px);
+    transition: transform 0.08s, background 0.15s;
   }
   #controls button:active {
     background: ${colors.primary};
+    color: #fff;
     transform: scale(0.92);
   }
   #overlay {
@@ -190,7 +190,6 @@ ${audRuntime}
     OFF_Y = topPad + Math.floor((availH - CELL * ROWS) / 2);
   }
 
-  // AUDIO
   __initAudio(__cfg.audio && __cfg.audio.enabled, __cfg.audio && __cfg.audio.volume);
   function sound(kind) {
     if (!__cfg.audio || !__cfg.audio.enabled) return;
@@ -198,7 +197,6 @@ ${audRuntime}
     __playSound(type);
   }
 
-  // STATE
   var state = 'start';
   var snake = [];
   var dir = { x: 1, y: 0 };
@@ -207,6 +205,10 @@ ${audRuntime}
   var score = 0;
   var lastMove = 0;
   var speedMs = __cfg.speed;
+
+  // Emoji из конфига
+  var foodEmoji = (__cfg.sprites && __cfg.sprites.food && __cfg.sprites.food.type === 'emoji' && __cfg.sprites.food.emoji) || '';
+  var playerEmoji = (__cfg.sprites && __cfg.sprites.player && __cfg.sprites.player.type === 'emoji' && __cfg.sprites.player.emoji) || '';
 
   var scoreEl = document.getElementById('score');
   var overlay = document.getElementById('overlay');
@@ -291,23 +293,30 @@ ${audRuntime}
 
   function gameOver() {
     state = 'gameover';
-    var tmpl = __cfg.texts && __cfg.texts.gameOverTitle || 'Игра окончена';
-    var hintTmpl = __cfg.texts && __cfg.texts.gameOverHint || 'Счёт: {score}';
+    var tmpl = (__cfg.texts && __cfg.texts.gameOverTitle) || 'Игра окончена';
+    var hintTmpl = (__cfg.texts && __cfg.texts.gameOverHint) || 'Счёт: {score}';
     overlayTitle.textContent = tmpl;
     overlayHint.textContent = hintTmpl.replace('{score}', String(score));
     overlay.classList.add('show');
     sound('gameOver');
   }
 
+  function renderEmoji(emoji, x, y, size) {
+    ctx.font = Math.round(size) + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, x, y);
+  }
+
   var startTime = performance.now();
+
   function render() {
     var W = window.innerWidth, H = window.innerHeight;
     var time = performance.now() - startTime;
 
-    // Фон
     __drawBackground(ctx, __cfg.background, W, H, time);
 
-    // Игровое поле
+    // Поле
     ctx.fillStyle = __cfg.colors.surface;
     ctx.globalAlpha = 0.85;
     ctx.fillRect(OFF_X, OFF_Y, CELL * COLS, CELL * ROWS);
@@ -329,21 +338,52 @@ ${audRuntime}
       ctx.stroke();
     }
 
-    // Еда
+    // Еда — emoji или круг с пульсацией
     var fx = OFF_X + food.x * CELL;
     var fy = OFF_Y + food.y * CELL;
-    __drawSprite(ctx, __cfg.sprites.food, fx, fy, CELL, time, __cfg.animations.food);
+    var foodPulse = 1 + Math.sin(time / 300) * 0.08;
+    if (foodEmoji) {
+      renderEmoji(foodEmoji, fx + CELL / 2, fy + CELL / 2, CELL * 0.95 * foodPulse);
+    } else {
+      ctx.fillStyle = __cfg.colors.accent;
+      ctx.beginPath();
+      ctx.arc(fx + CELL / 2, fy + CELL / 2, CELL * 0.35 * foodPulse, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
-    // Змейка
+    // Змейка — emoji на голову и тело (если задан), иначе квадраты
     for (var k = 0; k < snake.length; k++) {
       var sx = OFF_X + snake[k].x * CELL;
       var sy = OFF_Y + snake[k].y * CELL;
       var isHead = k === 0;
-      var sprite = __cfg.sprites.player;
-      if (!isHead && sprite && sprite.type === 'shape') {
-        sprite = { type: 'shape', shape: sprite.shape, size: sprite.size, color: sprite.color, outline: sprite.outline };
+
+      if (playerEmoji && isHead) {
+        renderEmoji(playerEmoji, sx + CELL / 2, sy + CELL / 2, CELL * 0.95);
+      } else if (playerEmoji && !isHead) {
+        // Тело — тот же emoji, но чуть меньше и с прозрачностью
+        ctx.globalAlpha = 0.75;
+        renderEmoji(playerEmoji, sx + CELL / 2, sy + CELL / 2, CELL * 0.75);
+        ctx.globalAlpha = 1;
+      } else {
+        var fill = isHead ? __cfg.colors.primary : __cfg.colors.primary + 'cc';
+        ctx.fillStyle = fill;
+        // Скруглённый квадрат
+        var pad = isHead ? 1 : 2;
+        var r = CELL * 0.25;
+        var x0 = sx + pad, y0 = sy + pad, w = CELL - 2 * pad, h = CELL - 2 * pad;
+        ctx.beginPath();
+        ctx.moveTo(x0 + r, y0);
+        ctx.lineTo(x0 + w - r, y0);
+        ctx.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + r);
+        ctx.lineTo(x0 + w, y0 + h - r);
+        ctx.quadraticCurveTo(x0 + w, y0 + h, x0 + w - r, y0 + h);
+        ctx.lineTo(x0 + r, y0 + h);
+        ctx.quadraticCurveTo(x0, y0 + h, x0, y0 + h - r);
+        ctx.lineTo(x0, y0 + r);
+        ctx.quadraticCurveTo(x0, y0, x0 + r, y0);
+        ctx.closePath();
+        ctx.fill();
       }
-      __drawSprite(ctx, sprite, sx, sy, CELL, time, isHead ? __cfg.animations.player : 'none');
     }
 
     if (state === 'start') {
@@ -358,7 +398,6 @@ ${audRuntime}
     }
   }
 
-  var lastFrame = 0;
   function loop(now) {
     if (!now) now = performance.now();
     if (state === 'playing' && now - lastMove >= speedMs) {
@@ -369,7 +408,6 @@ ${audRuntime}
     requestAnimationFrame(loop);
   }
 
-  // CONTROLS
   function bindDir(name) {
     var el = document.getElementById('btn' + name.charAt(0).toUpperCase() + name.slice(1));
     if (!el) return;
