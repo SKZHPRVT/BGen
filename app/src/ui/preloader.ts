@@ -5,15 +5,12 @@
  *  1. Пиксельный шарик BeeLine собирается из хаоса в центре
  *  2. Строка [BE......] — B,E,E всегда чёрные, дальше буквы чередуются жёлтый-чёрный
  *  3. E бежит к правой скобке
- *  4. GEN появляется внизу большими буквами
+ *  4. GEN появляется внизу: G у левой скобки, E по центру, N у правой
  *  5. Fade-out → показывается приложение
  */
 
 const YELLOW = "#ffdd00";
 const BLACK = "#000000";
-const DOT = "#cccccc";
-
-const BALL_TOTAL_PIXELS = 6; // размер пикселя в координатах canvas
 
 export async function runPreloader(): Promise<void> {
   const preloaderEl = document.getElementById("preloader");
@@ -51,11 +48,16 @@ export async function runPreloader(): Promise<void> {
     await sleep(180);
   }
 
-  // 4. Даём шарику дособраться (общая длительность ~2.4 сек)
+  // 4. Даём шарику дособраться
   await sleep(600);
 
-  // 5. Показываем GEN
-  genEl.textContent = "GEN";
+  // 5. Показываем GEN — каждая буква в отдельном span,
+  //    чтобы через flex space-between буквы легли:
+  //    G — к левой скобке, E — по центру, N — к правой скобке.
+  genEl.innerHTML =
+    '<span class="bee-gen-letter">G</span>' +
+    '<span class="bee-gen-letter">E</span>' +
+    '<span class="bee-gen-letter">N</span>';
   genEl.classList.add("show");
 
   // 6. Пауза на "полюбоваться"
@@ -86,7 +88,7 @@ function renderLetters(text: string): string {
       if (ch === "·") return `<span class="bee-dot">·</span>`;
       if (ch === "B") return `<span class="bee-black">B</span>`;
       if (ch === "E") {
-        // Первые 3 буквы (B + 2 E) — чёрные. Дальше — чередование.
+        // Первые 2 E — чёрные. Дальше — чередование.
         const cls = eIndex < 2 ? "bee-black" : eIndex % 2 === 0 ? "bee-black" : "bee-yellow";
         eIndex++;
         return `<span class="${cls}">E</span>`;
@@ -103,16 +105,14 @@ function sleep(ms: number): Promise<void> {
 // ─────────────────────────────────────────────────────────────
 // Пиксельный шарик BeeLine
 // ─────────────────────────────────────────────────────────────
-// Рисуем аккуратный шар с диагональными полосами (жёлтый-чёрный),
-// который собирается из хаоса за ~2 секунды.
 
 interface Pixel {
-  sx: number; sy: number;   // старт
-  tx: number; ty: number;   // цель
-  x: number;  y: number;    // текущая
+  sx: number; sy: number;
+  tx: number; ty: number;
+  x: number; y: number;
   color: string;
-  delay: number;            // задержка старта
-  duration: number;         // длительность полёта
+  delay: number;
+  duration: number;
 }
 
 function assembleBall(canvas: HTMLCanvasElement): void {
@@ -124,50 +124,29 @@ function assembleBall(canvas: HTMLCanvasElement): void {
   const CX = W / 2;
   const CY = H / 2;
   const R = Math.min(W, H) * 0.42;
-  const PIXEL = 4; // размер пикселя в координатах canvas
+  const PIXEL = 4;
 
-  // Собираем пиксели из сетки внутри круга
   const pixels: Pixel[] = [];
 
-  // ─────────────────────────────────────────────────────────
-  // Рисуем ТОЛЬКО контур и полоски — внутренние пиксели тоже,
-  // но цвет определяется формулой "диагональные полосы".
-  //
-  // Формула: bandIndex = floor((u + v) / bandHeight) % 2
-  //   где u,v — координаты относительно центра.
-  // Проецируем на диагональ 45°: d = (u + v) / sqrt(2).
-  // Каждая полоса шириной BAND_WIDTH.
-  // ─────────────────────────────────────────────────────────
-
-  const BAND_WIDTH = R / 1.5; // 4 полосы на шар
+  const BAND_WIDTH = R / 1.5;
 
   for (let y = -R; y <= R; y += PIXEL) {
     for (let x = -R; x <= R; x += PIXEL) {
       const dist = Math.sqrt(x * x + y * y);
       if (dist > R) continue;
 
-      // Координаты центра пикселя
       const px = x + PIXEL / 2;
       const py = y + PIXEL / 2;
 
-      // Диагональная проекция под 45°
       const diagonal = (px + py) / Math.SQRT2;
-      const bandIndex = Math.floor(diagonal / BAND_WIDTH + 10) % 2;
-
-      // Более простая формула для полос:
-      // Цвет зависит от диагонали, полосы симметричные
       const bandAngle = Math.atan2(py, px);
-      const combined = bandAngle + Math.PI; // 0..2π
+      const combined = bandAngle + Math.PI;
       const bandSeg = Math.floor((combined + diagonal * 0.005) / (Math.PI / 3)) % 2;
       const color = bandSeg === 0 ? YELLOW : BLACK;
-
-      // Пропускаем пиксели у самого края, чтобы контур был ровный
-      // (опционально, для аккуратного края)
 
       const targetX = CX + px;
       const targetY = CY + py;
 
-      // Стартовая позиция — хаос по всему полотну
       const startX = Math.random() * W;
       const startY = Math.random() * H;
 
@@ -185,11 +164,7 @@ function assembleBall(canvas: HTMLCanvasElement): void {
     }
   }
 
-  // ─────────────────────────────────────────────────────────
-  // Анимация
-  // ─────────────────────────────────────────────────────────
   const startTime = performance.now();
-  const totalDuration = 2400; // мс
 
   function frame(now: number) {
     ctx.clearRect(0, 0, W, H);
@@ -200,9 +175,7 @@ function assembleBall(canvas: HTMLCanvasElement): void {
       const clamped = Math.min(1, t);
       if (clamped < 1) allDone = false;
 
-      // Ease-out cubic
       const eased = 1 - Math.pow(1 - clamped, 3);
-
       p.x = p.sx + (p.tx - p.sx) * eased;
       p.y = p.sy + (p.ty - p.sy) * eased;
 
@@ -213,7 +186,6 @@ function assembleBall(canvas: HTMLCanvasElement): void {
     if (!allDone) {
       requestAnimationFrame(frame);
     } else {
-      // Финальная отрисовка — статичный шарик
       ctx.clearRect(0, 0, W, H);
       for (const p of pixels) {
         ctx.fillStyle = p.color;

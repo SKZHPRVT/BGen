@@ -89,6 +89,15 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   image-rendering: crisp-edges;
 }
 
+/* Обёртка для [BE......] + GEN, чтобы они были одной ширины */
+.bee-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+
 /* Строка [BE......] */
 .bee-bar {
   display: flex;
@@ -101,6 +110,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   letter-spacing: 0.02em;
   line-height: 1;
   white-space: nowrap;
+  width: 100%;
 }
 
 .bee-bracket {
@@ -120,20 +130,19 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 .bee-letters .bee-black  { color: #000000; }
 .bee-letters .bee-dot    { color: #cccccc; }
 
-/* GEN — большими буквами, растянуто по ширине [BEEEEEEE] */
+/* GEN — три буквы: G к левой скобке, E по центру, N к правой.
+   Растягиваем через flex space-between на всю ширину [BE......]. */
 .bee-gen {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
   font-family: var(--font-mono);
   font-size: clamp(38px, 11vw, 56px);
   font-weight: 900;
-  /* letter-spacing подобран так, чтобы "GEN" визуально совпадал по ширине
-     с "[BEEEEEEE]" при том же размере шрифта.
-     Ширина [BEEEEEEE] ≈ 10 глифов. GEN = 3 глифа + 2 пробела. */
-  letter-spacing: 2.4em;
-  padding-left: 2.4em; /* компенсация смещения из-за letter-spacing */
+  line-height: 1;
   color: #000000;
-  text-align: center;
   white-space: nowrap;
-  width: 100%;
   opacity: 0;
   transform: translateY(12px) scale(0.96);
   transition:
@@ -144,6 +153,12 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 .bee-gen.show {
   opacity: 1;
   transform: translateY(0) scale(1);
+}
+
+.bee-gen-letter {
+  display: inline-block;
+  text-align: center;
+  flex: 0 0 auto;
 }
 
 /* ============================================ */
