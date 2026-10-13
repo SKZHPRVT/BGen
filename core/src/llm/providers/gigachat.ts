@@ -5,8 +5,7 @@
  *   - Не совместим с OpenAI: сначала OAuth-токен, потом чат-запросы.
  *   - Токен живёт 30 минут, обновляем автоматически.
  *   - Использует сертификат Минцифры РФ → в Node/Bun даёт "self signed certificate".
- *     Решение: собственный undici Agent с `rejectUnauthorized: false`
- *     для домена GigaChat. Шифрование остаётся, только отключается проверка CA.
+ *     Решение: env NODE_TLS_REJECT_UNAUTHORIZED=0 в Railway.
  *
  * Требует env:
  *   GIGACHAT_AUTH_KEY  — base64(ClientID:ClientSecret)
@@ -69,7 +68,7 @@ export class GigaChatProvider extends BaseProvider {
           Authorization: `Basic ${this.authKey}`,
         },
         body: body.toString(),
-        // @ts-ignore — Bun/Node поддерживают tls-опции
+        // @ts-ignore
         tls: { rejectUnauthorized: false },
       });
     } catch (e) {
@@ -137,6 +136,40 @@ export class GigaChatProvider extends BaseProvider {
     } catch (e) {
       if (e instanceof ProviderError) throw e;
       throw new ProviderError(this.name, (e as Error).message, e);
+    }
+  }
+
+  /**
+   * Генерация JSON-конфига игры.
+   * Возвращает распарсенный JSON.
+   */
+  async generateConfig(system: string, user: string): Promise<any> {
+    const text = await this.generate({
+      system,
+      user,
+      temperature: 0.7,
+      maxTokens: 2000,
+    });
+
+    // Очищаем возможные markdown-обёртки
+    let cleaned = text.trim();
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, "");
+    cleaned = cleaned.replace(/\n?```\s*$/i, "");
+
+    // Ищем JSON в тексте
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start === -1 || end === -1) {
+      throw new Error("LLM did not return JSON");
+    }
+
+    const jsonStr = cleaned.slice(start, end + 1);
+    try {
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      throw new Error(
+        `Invalid JSON from LLM: ${(e as Error).message}\nRaw: ${jsonStr.slice(0, 300)}`,
+      );
     }
   }
 }

@@ -22,6 +22,11 @@ import { SemanticCache } from "./cache/semantic.ts";
 import { globalMetrics } from "./telemetry/metrics.ts";
 import { logger } from "./telemetry/logger.ts";
 
+// Engine (шаблонный движок для популярных жанров)
+import { isSupported, buildGame } from "./engine/build.ts";
+import { buildConfigPrompt } from "./engine/prompts.ts";
+import { normalizeConfig } from "./engine/types.ts";
+
 export interface GeneratorOptions {
   router?: Router;
   providers?: LLMProvider[];
@@ -64,7 +69,9 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         audience: spec.audience,
       });
 
+      // ─────────────────────────────────────────────────────────
       // 1. Кэш
+      // ─────────────────────────────────────────────────────────
       if (opts.useCache !== false) {
         const cached = cache.get(spec);
         if (cached) {
@@ -85,7 +92,95 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         globalMetrics.recordCacheMiss();
       }
 
-      // 2. Few-shot из корпуса
+      // ─────────────────────────────────────────────────────────
+      // 2. ЕСЛИ ЖАНР ПОДДЕРЖИВАЕТСЯ ДВИЖКОМ — идём через движок
+      // ─────────────────────────────────────────────────────────
+      if (isSupported(spec.genre)) {
+        logger.info("Using engine", { genre: spec.genre });
+        try {
+          const { system, user } = buildConfigPrompt(
+            spec.genre,
+            spec.audience,
+            userInput.prompt,
+          );
+
+          let rawConfig: any = null;
+          let providerName = "engine-default";
+
+          // Пробуем получить JSON-конфиг от LLM через router
+          try {
+            const res = await router.generate({
+              system,
+              user,
+              maxTokens: 2000,
+              temperature: 0.7,
+            });
+            providerName = res.provider;
+
+            // Парсим JSON из ответа
+            let cleaned = res.text.trim();
+            cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, "");
+            cleaned = cleaned.replace(/\n?```\s*$/i, "");
+            const js = cleaned.indexOf("{");
+            const je = cleaned.lastIndexOf("}");
+            if (js !== -1 && je !== -1) {
+              try {
+                rawConfig = JSON.parse(cleaned.slice(js, je + 1));
+              } catch (parseErr) {
+                logger.warn("JSON parse failed, using default config", {
+                  error: (parseErr as Error).message,
+                  raw: cleaned.slice(0, 200),
+                });
+              }
+            }
+          } catch (e) {
+            logger.warn("Engine LLM config failed, using default", {
+              error: (e as Error).message,
+            });
+          }
+
+          const cfg = normalizeConfig(rawConfig, spec.genre);
+          const html = buildGame(cfg);
+
+          // Валидация собранного HTML (быстрая — движок гарантирует структуру)
+          const report = analyze(html, { html });
+
+          if (report.ok && opts.useCache !== false) {
+            cache.set(spec, html);
+          }
+
+          const durationMs = Date.now() - start;
+          globalMetrics.recordGeneration(spec.genre, 1, durationMs, false);
+          logger.info("Engine generation done", {
+            genre: spec.genre,
+            provider: providerName,
+            ok: report.ok,
+            durationMs,
+            title: cfg.title,
+          });
+
+          return {
+            html,
+            spec,
+            attempts: 1,
+            provider: `engine+${providerName}`,
+            warnings: report.warnings.map((w) => `${w.id}: ${w.message}`),
+            repairedErrors: [],
+            fromCache: false,
+            ok: report.ok,
+            durationMs,
+          };
+        } catch (e) {
+          logger.error("Engine failed, falling back to LLM", {
+            error: (e as Error).message,
+          });
+          // Не падаем — идём по старому пути через LLM
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // 3. Few-shot из корпуса (старый pipeline для неизвестных жанров)
+      // ─────────────────────────────────────────────────────────
       let examples: string[] = [];
       if (opts.useCorpus !== false) {
         const corpus: CorpusEntry[] = await loadCorpus(corpusDir);
@@ -99,10 +194,14 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         }
       }
 
-      // 3. Компиляция промпта
+      // ─────────────────────────────────────────────────────────
+      // 4. Компиляция промпта
+      // ─────────────────────────────────────────────────────────
       const compiled = compile(userInput, { examples });
 
-      // 4. Генерация с auto-repair
+      // ─────────────────────────────────────────────────────────
+      // 5. Генерация с auto-repair
+      // ─────────────────────────────────────────────────────────
       const result = await generateWithRepair(
         router,
         compiled.system,
@@ -116,7 +215,6 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         },
       );
 
-      // 5. Кэш (только валидные игры)
       const finalOk = result.report.ok;
       if (finalOk && opts.useCache !== false) {
         cache.set(spec, result.html);
@@ -148,8 +246,7 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
       // Классифицируем новый промпт
       const newSpec = classify(newPrompt);
 
-      // Если жанр определён нечётко — наследуем контекст от предыдущего промпта.
-      // Это нужно, чтобы "добавь уровни" не превращалось в genre=unknown.
+      // Если жанр определён нечётко — наследуем контекст от предыдущего промпта
       const isGeneric = newSpec.genre === "unknown";
 
       const effectivePrompt =
