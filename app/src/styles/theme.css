@@ -33,8 +33,7 @@
   padding: 0;
 }
 
-/* Как в its_my_fairytale: height: 100%; overflow: hidden.
-   Без position: fixed, без inset: 0. Telegram сам управляет html/body. */
+/* Как в its_my_fairytale: height: 100%; overflow: hidden. */
 html, body {
   height: 100%;
   overflow: hidden;
@@ -170,7 +169,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: calc(var(--safe-top) + 16px) calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 32px) calc(var(--safe-left) + 12px);
+  padding: 16px 12px 32px 12px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -180,11 +179,17 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 }
 
 .app-root > * {
-  /* Ограничиваем ширину внутри */
   max-width: 640px;
   width: 100%;
   margin-left: auto;
   margin-right: auto;
+}
+
+/* В TMA Telegram-шапка («Закрыть» / «BGen» / ⋯) занимает ~56px сверху.
+   env(safe-area-inset-top) в Telegram обычно 0, поэтому добавляем
+   собственный отступ, чтобы наш UI не перекрывался кнопками. */
+body.is-telegram .app-root {
+  padding-top: 64px;
 }
 
 @keyframes app-fade-in {
@@ -314,7 +319,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 .bgen-status.success {
   color: #060;
   background: #f0fff0;
-  border-left-color: #0a0a0;
+  border-left-color: #0a0a0a;
 }
 
 .bgen-iteration {
@@ -349,7 +354,6 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   display: block;
 }
 
-/* В TMA — игра выше */
 body.is-telegram .bgen-frame {
   height: 62vh;
   min-height: 0;
