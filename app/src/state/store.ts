@@ -1,3 +1,11 @@
+/**
+ * Простейшее observable-хранилище.
+ *
+ * ВАЖНО: addGame обновляет state СИНХРОННО, а сохранение в storage
+ * делает в фоне (fire-and-forget). Это не блокирует UI в TMA,
+ * где CloudStorage может тормозить.
+ */
+
 import { storage } from "./storage.ts";
 
 export interface GameRecord {
@@ -65,35 +73,44 @@ class Store {
     this.emit();
   }
 
+  /**
+   * СИНХРОННО обновляет state и возвращает управление.
+   * Сохранение в storage — в фоне. UI не блокируется.
+   */
   async addGame(rec: GameRecord): Promise<void> {
     this.state.history = [rec, ...this.state.history].slice(0, MAX_HISTORY);
     this.state.currentGame = rec;
     this.emit();
-    await this.persist();
+
+    // Fire-and-forget — не блокируем клиента
+    this.persistBackground();
   }
 
   async removeGame(id: string): Promise<void> {
     this.state.history = this.state.history.filter((g) => g.id !== id);
     this.emit();
-    await this.persist();
+    this.persistBackground();
   }
 
   async clearHistory(): Promise<void> {
     this.state.history = [];
     this.emit();
-    await this.persist();
+    this.persistBackground();
   }
 
   private emit(): void {
     for (const fn of this.listeners) fn(this.state);
   }
 
-  private async persist(): Promise<void> {
-    try {
-      await storage.set(STORAGE_KEY, JSON.stringify(this.state.history));
-    } catch (e) {
+  /**
+   * Сохранение в фоне. Не блокирует UI.
+   */
+  private persistBackground(): void {
+    const data = JSON.stringify(this.state.history);
+    // Не await — просто запускаем и забываем
+    storage.set(STORAGE_KEY, data).catch((e) => {
       console.warn("[store] persist failed", e);
-    }
+    });
   }
 }
 
