@@ -2,9 +2,16 @@
  * Игровые инварианты. Проверяют, что перед нами действительно игра,
  * а не набор div'ов, и что она запускается в играбельном состоянии.
  *
- * ВАЖНО: проверки init-state ищут ТОЛЬКО объявление переменной
- * (`let state = "..."`, `var state = "..."`, `const state = "..."`),
- * а не любое упоминание (например, `if (state === "gameover")`).
+ * Severity:
+ *   error   — блокирует приёмку, запускает repair loop
+ *   warning — не блокирует, идёт в UI как замечание
+ *
+ * Правила для severity:
+ *   - no-game-loop, no-input, no-state-machine — error (игра не работает)
+ *   - starts-in-gameover, starts-in-win — error (игра сразу проиграна)
+ *   - handler-called-without-event, event-without-handler — error (упадёт JS)
+ *   - no-win-lose — warning (бесконечные аркады валидны)
+ *   - no-touch, no-restart, no-resize, no-viewport, no-score — warning
  */
 import type { InvariantIssue } from "../types.ts";
 import type { MiniAst } from "./miniAst.ts";
@@ -34,7 +41,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     });
   }
 
-  // Мобильное управление
+  // Мобильное управление — важно для TMA
   if (!ast.hasTouch) {
     issues.push({
       id: "no-touch",
@@ -54,13 +61,14 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     });
   }
 
-  // Победа/поражение
+  // Победа/поражение — теперь WARNING.
+  // Бесконечные аркады (кликеры, раннеры) валидны без win-условия.
   if (!ast.hasWinLose) {
     issues.push({
       id: "no-win-lose",
-      severity: "error",
-      message: "Нет условия победы или поражения",
-      hint: "Добавь экран 'Игра окончена' и/или 'Победа' с кнопкой рестарта.",
+      severity: "warning",
+      message: "Нет явного условия победы/поражения",
+      hint: "Для аркад это нормально. Для змейки/2048/платформера добавь win/lose.",
     });
   }
 
@@ -141,10 +149,8 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // ФУНКЦИЯ-ОБРАБОТЧИК ВЫЗЫВАЕТСЯ БЕЗ EVENT
+  // Функция-обработчик вызывается без event
   // ─────────────────────────────────────────────────────────────
-  // Ищем объявление функции, которая использует event.key / event.touches /
-  // event.clientX, но при этом где-то вызывается без аргумента: name().
   const handlerNames = [
     ...html.matchAll(
       /function\s+(\w*(?:Handle|Input|Key|Touch|Click|Tap|Press)\w*)\s*\(\s*(\w+)\s*\)\s*\{([^}]{0,500})/gi,
@@ -165,18 +171,16 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
           `вызываться ТОЛЬКО из addEventListener('keydown'|'touchstart'|...) ` +
           `с event аргументом. Убери прямой вызов ${name}() и добавь addEventListener.`,
       });
-      break; // одного раза достаточно
+      break;
     }
   }
 
   // ─────────────────────────────────────────────────────────────
-  // EVENT ИСПОЛЬЗУЕТСЯ БЕЗ ПРОВЕРКИ
+  // event используется, но нет addEventListener
   // ─────────────────────────────────────────────────────────────
-  // Если в коде есть event.key / event.touches БЕЗ передачи event в функцию
   const usesEventKey = /\bevent\.(key|touches|clientX|clientY)\b/i.test(html);
-  const hasKeydownHandler = /addEventListener\s*\(\s*['"`](keydown|touchstart|pointerdown)/i.test(
-    html,
-  );
+  const hasKeydownHandler =
+    /addEventListener\s*\(\s*['"`](keydown|touchstart|pointerdown)/i.test(html);
   if (usesEventKey && !hasKeydownHandler) {
     issues.push({
       id: "event-without-handler",
