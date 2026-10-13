@@ -14,87 +14,156 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;700;900&display=swap" rel="stylesheet">
 
-  <!-- Синхронный SDK — как в its_my_fairytale -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div id="preloader" class="preloader">
-    <div class="preloader-content">
-      <canvas id="bee-ball" class="bee-ball" width="480" height="480"></canvas>
 
-      <div class="bee-block">
-        <div class="bee-bar">
-          <span class="bee-bracket">[</span>
-          <span id="bee-letters" class="bee-letters"></span>
-          <span class="bee-bracket">]</span>
+  <!-- =========================================== -->
+  <!-- ЭКРАН 1: СТАРТ                               -->
+  <!-- =========================================== -->
+  <section id="screen-start" class="screen screen-start">
+    <div class="screen-inner">
+      <h1 class="hero-title">Создай игру</h1>
+      <p class="hero-subtitle">Опиши идею — ИИ сделает игру за 30-60 секунд</p>
+
+      <textarea
+        id="promptInput"
+        class="prompt-input"
+        placeholder="замути змейку для бабушки"
+        rows="3"
+        maxlength="500"
+      ></textarea>
+
+      <div class="mode-picker">
+        <label class="mode-option">
+          <input type="radio" name="audience" value="default" checked>
+          <span class="mode-icon">🎯</span>
+          <span class="mode-label">Обычная</span>
+        </label>
+        <label class="mode-option">
+          <input type="radio" name="audience" value="elderly">
+          <span class="mode-icon">👵</span>
+          <span class="mode-label">Для бабушки</span>
+        </label>
+        <label class="mode-option">
+          <input type="radio" name="audience" value="kids">
+          <span class="mode-icon">🧒</span>
+          <span class="mode-label">Для детей</span>
+        </label>
+        <label class="mode-option">
+          <input type="radio" name="audience" value="hardcore">
+          <span class="mode-icon">🔥</span>
+          <span class="mode-label">Хардкор</span>
+        </label>
+      </div>
+
+      <button id="startBtn" class="btn-primary">
+        <span class="btn-primary-icon">▶</span>
+        <span>СТАРТ</span>
+      </button>
+
+      <button id="allGamesBtn" class="btn-secondary">
+        📚 Все мои игры <span id="gamesCount" class="games-count">0</span>
+      </button>
+
+      <div id="startStatus" class="screen-status" hidden></div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- ЭКРАН 2: ПРЕЛОАДЕР ГЕНЕРАЦИИ                 -->
+  <!-- =========================================== -->
+  <section id="screen-loading" class="screen screen-loading" hidden>
+    <canvas id="chaos-canvas" class="chaos-canvas"></canvas>
+
+    <div class="loading-bottom">
+      <div class="loading-hint">Генерирую игру…</div>
+      <div class="loading-bee">
+        <span class="bee-bracket">[</span>
+        <span id="bee-letters" class="bee-letters"></span>
+        <span class="bee-bracket">]</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- ЭКРАН 3: ИГРА (на весь экран)                -->
+  <!-- =========================================== -->
+  <section id="screen-game" class="screen screen-game" hidden>
+    <iframe
+      id="gameFrame"
+      class="game-frame-fullscreen"
+      sandbox="allow-scripts"
+      title="Сгенерированная игра"
+    ></iframe>
+
+    <!-- Кнопка настроек в правом верхнем углу -->
+    <button id="settingsBtn" class="float-settings-btn" title="Настройки">⚙</button>
+  </section>
+
+  <!-- =========================================== -->
+  <!-- МОДАЛ НАСТРОЕК                                -->
+  <!-- =========================================== -->
+  <div id="settingsModal" class="modal" hidden>
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span class="modal-title">Настройки</span>
+        <button id="modalClose" class="modal-close">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Мета игры -->
+        <div class="modal-meta" id="modalMeta">—</div>
+
+        <!-- Итерация -->
+        <div class="modal-section">
+          <label class="modal-label">🔧 Доработать</label>
+          <textarea
+            id="iterateInput"
+            class="modal-input"
+            placeholder="сделай кнопки больше / добавь уровни..."
+            rows="2"
+            maxlength="200"
+          ></textarea>
+          <button id="iterateBtn" class="modal-btn modal-btn-primary">Доработать</button>
         </div>
 
-        <div id="bee-gen" class="bee-gen"></div>
+        <!-- Действия -->
+        <div class="modal-section modal-actions">
+          <button id="exportBtn" class="modal-btn">⬇ Скачать .html</button>
+          <button id="shareBtn" class="modal-btn">↗ Поделиться</button>
+          <button id="restartBtn" class="modal-btn">⟳ Начать заново</button>
+          <button id="fullscreenBtn" class="modal-btn">⛶ На весь экран</button>
+        </div>
+
+        <!-- Новая игра -->
+        <div class="modal-section">
+          <button id="newGameBtn" class="modal-btn modal-btn-primary">
+            ✨ Создать новую игру
+          </button>
+        </div>
       </div>
     </div>
   </div>
 
-  <div id="app" class="app-root" hidden>
-    <header class="bgen-header">
-      <h1>🎮 BGen</h1>
-      <p class="subtitle">ИИ-генератор браузерных игр</p>
-    </header>
-
-    <section class="bgen-controls">
-      <textarea
-        id="promptInput"
-        class="bgen-input"
-        placeholder="замути змейку для бабушки"
-        rows="2"
-        maxlength="500"
-      ></textarea>
-
-      <div class="bgen-row">
-        <select id="audienceSelect" class="bgen-select">
-          <option value="default">🎯 Обычная</option>
-          <option value="elderly">👵 Для бабушки</option>
-          <option value="kids">🧒 Для детей</option>
-          <option value="hardcore">🔥 Хардкор</option>
-        </select>
-
-        <button id="generateBtn" class="bgen-btn bgen-btn-primary">
-          ✨ Создать игру
+  <!-- =========================================== -->
+  <!-- МОДАЛ «ВСЕ ИГРЫ»                              -->
+  <!-- =========================================== -->
+  <div id="gamesModal" class="modal" hidden>
+    <div class="modal-backdrop"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <span class="modal-title">Мои игры</span>
+        <button id="gamesClose" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="gamesList" class="games-list"></div>
+        <button id="gamesNewBtn" class="modal-btn modal-btn-primary" style="margin-top:16px">
+          ✨ Создать новую игру
         </button>
       </div>
-
-      <div id="statusBar" class="bgen-status" hidden></div>
-
-      <div id="iterationPanel" class="bgen-iteration" hidden>
-        <input
-          id="iterationInput"
-          class="bgen-input bgen-input-small"
-          placeholder="сделай кнопки больше / добавь уровни..."
-          maxlength="200"
-        />
-        <button id="iterateBtn" class="bgen-btn">🔧 Доработать</button>
-      </div>
-    </section>
-
-    <section class="bgen-preview">
-      <div class="bgen-preview-header">
-        <span id="previewMeta" class="bgen-meta">Игра появится здесь</span>
-        <button id="exportBtn" class="bgen-btn bgen-btn-icon" title="Скачать .html" hidden>⬇</button>
-        <button id="shareBtn" class="bgen-btn bgen-btn-icon" title="Поделиться" hidden>↗</button>
-        <button id="fullscreenBtn" class="bgen-btn bgen-btn-icon" title="На весь экран" hidden>⛶</button>
-        <button id="restartBtn" class="bgen-btn bgen-btn-icon" title="Начать заново" hidden>⟳</button>
-      </div>
-      <iframe
-        id="gameFrame"
-        class="bgen-frame"
-        sandbox="allow-scripts"
-        title="Сгенерированная игра"
-      ></iframe>
-    </section>
-
-    <section id="gallerySection" class="bgen-gallery" hidden>
-      <h2>📚 Мои игры</h2>
-      <div id="galleryList" class="bgen-gallery-list"></div>
-    </section>
+    </div>
   </div>
 
   <script type="module" src="/src/main.ts"></script>
