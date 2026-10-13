@@ -5,13 +5,6 @@
  * Severity:
  *   error   — блокирует приёмку, запускает repair loop
  *   warning — не блокирует, идёт в UI как замечание
- *
- * Правила для severity:
- *   - no-game-loop, no-input, no-state-machine — error (игра не работает)
- *   - starts-in-gameover, starts-in-win — error (игра сразу проиграна)
- *   - handler-called-without-event, event-without-handler — error (упадёт JS)
- *   - no-win-lose — warning (бесконечные аркады валидны)
- *   - no-touch, no-restart, no-resize, no-viewport, no-score — warning
  */
 import type { InvariantIssue } from "../types.ts";
 import type { MiniAst } from "./miniAst.ts";
@@ -20,7 +13,65 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   const issues: InvariantIssue[] = [];
   const html = ast.raw;
 
-  // Игровой цикл — критично
+  // ─────────────────────────────────────────────────────────────
+  // Canvas должен быть на весь экран
+  // ─────────────────────────────────────────────────────────────
+  const hardcodedCanvasSize =
+    /canvas\.width\s*=\s*\d{2,4}\s*;/i.test(html) ||
+    /canvas\.height\s*=\s*\d{2,4}\s*;/i.test(html);
+
+  const hasInnerSize =
+    /canvas\.(width|height)\s*=\s*(window\.)?inner(Width|Height)/i.test(html) ||
+    /canvas\.(width|height)\s*=\s*document\.(documentElement\.)?client(Width|Height)/i.test(html);
+
+  if (ast.hasCanvas && hardcodedCanvasSize && !hasInnerSize) {
+    issues.push({
+      id: "hardcoded-canvas-size",
+      severity: "error",
+      message: "Canvas размер задан хардкодом, а не под экран",
+      hint:
+        "Используй: canvas.width = window.innerWidth * (window.devicePixelRatio || 1); " +
+        "canvas.height = window.innerHeight * (window.devicePixelRatio || 1); " +
+        "canvas.style.width = window.innerWidth + 'px'; " +
+        "canvas.style.height = window.innerHeight + 'px'; " +
+        "И добавь addEventListener('resize', ...) для пересчёта.",
+    });
+  }
+
+  // Canvas есть, но ничего не рисуется
+  const hasFillRect = /\.fillRect\s*\(/i.test(html);
+  const hasFillText = /\.fillText\s*\(/i.test(html);
+  const hasDrawImage = /\.drawImage\s*\(/i.test(html);
+  const hasClearRect = /\.clearRect\s*\(/i.test(html);
+  const hasAnyDrawing = hasFillRect || hasFillText || hasDrawImage || hasClearRect;
+
+  if (ast.hasCanvas && !hasAnyDrawing) {
+    issues.push({
+      id: "canvas-no-drawing",
+      severity: "error",
+      message: "Canvas есть, но в коде нет команд отрисовки",
+      hint:
+        "Добавь ctx.fillRect() или ctx.fillText() в функцию render(). " +
+        "Без этого на canvas ничего не появится.",
+    });
+  }
+
+  // Неправильные HTML-entities для стрелок
+  const badEntities = /&(uarr|darr|larr|rarr|upp|dow|left|right);/i;
+  if (badEntities.test(html)) {
+    issues.push({
+      id: "bad-arrow-entities",
+      severity: "error",
+      message: "Неправильные HTML-entities для стрелок",
+      hint:
+        "Используй символы напрямую: ◀ ▲ ▼ ▶ (или unicode: &#x25C0; &#x25B2; &#x25BC; &#x25B6;). " +
+        "Не используй &uarr; &darr; &upp; &dow; — они не отображаются.",
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Игровой цикл
+  // ─────────────────────────────────────────────────────────────
   if (!ast.hasRequestAnimationFrame && !ast.hasSetInterval) {
     issues.push({
       id: "no-game-loop",
@@ -41,7 +92,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     });
   }
 
-  // Мобильное управление — важно для TMA
+  // Мобильное управление
   if (!ast.hasTouch) {
     issues.push({
       id: "no-touch",
@@ -61,8 +112,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     });
   }
 
-  // Победа/поражение — теперь WARNING.
-  // Бесконечные аркады (кликеры, раннеры) валидны без win-условия.
+  // Победа/поражение — WARNING
   if (!ast.hasWinLose) {
     issues.push({
       id: "no-win-lose",
@@ -119,9 +169,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   const head = html.slice(0, 4000);
 
   const startsInGameover =
-    /(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](gameover|game_over|game-over|lose|lost|dead|defeat)['"`]/i.test(
-      head,
-    );
+    /(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](gameover|game_over|game-over|lose|lost|dead|defeat)['"`]/i.test(head);
 
   if (startsInGameover) {
     issues.push({
@@ -135,9 +183,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   }
 
   const startsInWin =
-    /(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](win|won|victory|finished)['"`]/i.test(
-      head,
-    );
+    /(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](win|won|victory|finished)['"`]/i.test(head);
 
   if (startsInWin) {
     issues.push({
@@ -169,7 +215,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
         hint:
           `Функция ${name} использует event.key / event.touches и должна ` +
           `вызываться ТОЛЬКО из addEventListener('keydown'|'touchstart'|...) ` +
-          `с event аргументом. Убери прямой вызов ${name}() и добавь addEventListener.`,
+          `с event аргументом.`,
       });
       break;
     }
