@@ -1,13 +1,8 @@
 /**
  * BGen Game Engine — расширенная schema.
- * LLM генерирует конфиг, движок рендерит.
+ * 12 жанров + fallback emoji для каждого.
  */
-
 import type { Genre } from "../types.ts";
-
-// ─────────────────────────────────────────────────────────────
-// ЦВЕТА
-// ─────────────────────────────────────────────────────────────
 
 export interface GameColors {
   background: string;
@@ -20,10 +15,6 @@ export interface GameColors {
   shadow?: string;
   glow?: string;
 }
-
-// ─────────────────────────────────────────────────────────────
-// ФОН
-// ─────────────────────────────────────────────────────────────
 
 export type BackgroundType = "solid" | "gradient" | "particles" | "stars" | "grid" | "none";
 
@@ -39,48 +30,21 @@ export interface BackgroundConfig {
   };
 }
 
-// ─────────────────────────────────────────────────────────────
-// СПРАЙТЫ
-// ─────────────────────────────────────────────────────────────
-
 export type SpriteType = "emoji" | "shape" | "pixel" | "svg" | "none";
 export type ShapeName = "circle" | "square" | "roundedSquare" | "triangle" | "hexagon" | "star" | "diamond";
 
 export interface SpriteConfig {
   type: SpriteType;
-
-  // Emoji
   emoji?: string;
-
-  // Shape
   shape?: ShapeName;
-  size?: number;                  // 0.5-1.0 от клетки
+  size?: number;
   color?: string;
   outline?: { width: number; color: string };
-
-  // Pixel art
-  pixel?: {
-    size: number;                 // 8-24
-    palette: Record<string, string>; // {"o": "#ffb347", ".": "transparent"}
-    grid: string[];
-  };
-
-  // SVG
+  pixel?: { size: number; palette: Record<string, string>; grid: string[] };
   svg?: string;
 }
 
-// ─────────────────────────────────────────────────────────────
-// АНИМАЦИИ
-// ─────────────────────────────────────────────────────────────
-
-export type AnimationName =
-  | "none"
-  | "pulse"
-  | "shake"
-  | "rotate"
-  | "bounce"
-  | "breathe"
-  | "glow";
+export type AnimationName = "none" | "pulse" | "shake" | "rotate" | "bounce" | "breathe" | "glow";
 
 export interface AnimationsConfig {
   player?: AnimationName;
@@ -88,10 +52,6 @@ export interface AnimationsConfig {
   obstacle?: AnimationName;
   powerup?: AnimationName;
 }
-
-// ─────────────────────────────────────────────────────────────
-// ТЕКСТЫ
-// ─────────────────────────────────────────────────────────────
 
 export interface GameTexts {
   startTitle?: string;
@@ -104,10 +64,6 @@ export interface GameTexts {
   scorePrefix?: string;
   tutorial?: string;
 }
-
-// ─────────────────────────────────────────────────────────────
-// АУДИО
-// ─────────────────────────────────────────────────────────────
 
 export type SoundType = "pop" | "coin" | "beep" | "chime" | "click" | "fail" | "down" | "softFail" | "fanfare";
 
@@ -122,58 +78,56 @@ export interface GameAudio {
   };
 }
 
-// ─────────────────────────────────────────────────────────────
-// СТИЛЬ-ПРЕСЕТ (сокращение для LLM)
-// ─────────────────────────────────────────────────────────────
-
 export type StylePreset =
-  | "cozy"          // тёплый, пастельный, спокойный
-  | "neon"          // неон, тёмный фон, яркие контуры
-  | "retro8bit"     // 8-бит, пиксели, ограниченная палитра
-  | "minimal"       // минимализм, чёрно-белое, чистое
-  | "papercraft"    // бумажный, тёплый, слоистый
-  | "space"         // космос, фиолетовый/чёрный, звёзды
-  | "forest"        // зелёный, естественный
-  | "candy"         // яркий, детский, пастельный
-  | "cyberpunk"     // неон, розовый/циан, тёмный
-  | "nature";       // зелёный/коричневый, естественный
-
-// ─────────────────────────────────────────────────────────────
-// ГЛАВНЫЙ КОНФИГ
-// ─────────────────────────────────────────────────────────────
+  | "cozy" | "neon" | "retro8bit" | "minimal" | "papercraft"
+  | "space" | "forest" | "candy" | "cyberpunk" | "nature";
 
 export interface GameConfig {
   title: string;
   subtitle?: string;
   genre: Genre;
-
   stylePreset?: StylePreset;
-
   colors: GameColors;
   background?: BackgroundConfig;
-
   sprites?: {
     player?: SpriteConfig;
     food?: SpriteConfig;
     obstacle?: SpriteConfig;
     powerup?: SpriteConfig;
   };
-
   animations?: AnimationsConfig;
-
   texts?: GameTexts;
   audio?: GameAudio;
-
-  speed: number;                  // 60-400 ms
-  fontSize: number;               // 14-28
-  buttonSize: number;             // 56-96
+  speed: number;
+  fontSize: number;
+  buttonSize: number;
   gridSize?: number;
   difficulty?: "easy" | "normal" | "hard";
-
-  // Игровые параметры
   lives?: number;
   scorePerFood?: number;
   wrapAroundWalls?: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────
+// ДЕФОЛТНЫЕ EMOJI ПО ЖАНРУ (12 жанров)
+// ─────────────────────────────────────────────────────────────
+
+export function defaultEmojisForGenre(genre: Genre): { player: string; food: string; obstacle: string } {
+  switch (genre) {
+    case "snake":      return { player: "🐍", food: "🍎", obstacle: "🪨" };
+    case "runner":     return { player: "🏃", food: "⭐", obstacle: "🌵" };
+    case "breakout":   return { player: "🧱", food: "🏓", obstacle: "" };
+    case "tower":      return { player: "🏗", food: "", obstacle: "" };
+    case "platformer": return { player: "🧍", food: "🪙", obstacle: "🪨" };
+    case "clicker":    return { player: "👆", food: "🍪", obstacle: "" };
+    case "memory":     return { player: "", food: "🍎", obstacle: "" };
+    case "2048":       return { player: "", food: "", obstacle: "" };
+    case "racing":     return { player: "🏎️", food: "", obstacle: "🪨" };
+    case "fighting":   return { player: "🥷", food: "", obstacle: "👹" };
+    case "tanks":      return { player: "🚀", food: "", obstacle: "👾" };
+    case "tictactoe":  return { player: "✕", food: "◯", obstacle: "" };
+    default:           return { player: "🎮", food: "⭐", obstacle: "" };
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -183,15 +137,9 @@ export interface GameConfig {
 export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   cozy: {
     colors: {
-      background: "#fdf6e3",
-      surface: "#f5e6c8",
-      primary: "#2a7f62",
-      secondary: "#4fa583",
-      accent: "#c0392b",
-      text: "#2c1810",
-      grid: "#e8d4a8",
-      shadow: "#d4c4a0",
-      glow: "#ffd88a",
+      background: "#fdf6e3", surface: "#f5e6c8", primary: "#2a7f62",
+      secondary: "#4fa583", accent: "#c0392b", text: "#2c1810",
+      grid: "#e8d4a8", shadow: "#d4c4a0", glow: "#ffd88a",
     },
     background: { type: "solid" },
     animations: { player: "breathe", food: "pulse" },
@@ -199,15 +147,9 @@ export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   },
   neon: {
     colors: {
-      background: "#0a0a15",
-      surface: "#12122a",
-      primary: "#00ffd5",
-      secondary: "#00ccaa",
-      accent: "#ff00aa",
-      text: "#ffffff",
-      grid: "#1a1a3a",
-      shadow: "#000000",
-      glow: "#00ffd5",
+      background: "#0a0a15", surface: "#12122a", primary: "#00ffd5",
+      secondary: "#00ccaa", accent: "#ff00aa", text: "#ffffff",
+      grid: "#1a1a3a", shadow: "#000000", glow: "#00ffd5",
     },
     background: { type: "particles", particles: { count: 40, color: "#00ffd5", size: 2, speed: 0.2 } },
     animations: { player: "pulse", food: "glow" },
@@ -215,15 +157,9 @@ export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   },
   retro8bit: {
     colors: {
-      background: "#1a1a2e",
-      surface: "#16213e",
-      primary: "#f9d423",
-      secondary: "#ff4e50",
-      accent: "#00d4ff",
-      text: "#ffffff",
-      grid: "#0f3460",
-      shadow: "#000000",
-      glow: "#f9d423",
+      background: "#1a1a2e", surface: "#16213e", primary: "#f9d423",
+      secondary: "#ff4e50", accent: "#00d4ff", text: "#ffffff",
+      grid: "#0f3460", shadow: "#000000", glow: "#f9d423",
     },
     background: { type: "stars", particles: { count: 30, color: "#f9d423", size: 2, speed: 0.1 } },
     animations: { player: "shake", food: "bounce" },
@@ -231,15 +167,9 @@ export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   },
   minimal: {
     colors: {
-      background: "#ffffff",
-      surface: "#f5f5f5",
-      primary: "#111111",
-      secondary: "#333333",
-      accent: "#111111",
-      text: "#111111",
-      grid: "#e5e5e5",
-      shadow: "#dddddd",
-      glow: "#111111",
+      background: "#ffffff", surface: "#f5f5f5", primary: "#111111",
+      secondary: "#333333", accent: "#111111", text: "#111111",
+      grid: "#e5e5e5", shadow: "#dddddd", glow: "#111111",
     },
     background: { type: "solid" },
     animations: { player: "none", food: "none" },
@@ -247,15 +177,9 @@ export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   },
   space: {
     colors: {
-      background: "#0a0a1a",
-      surface: "#14142e",
-      primary: "#7c3aed",
-      secondary: "#a78bfa",
-      accent: "#fbbf24",
-      text: "#ffffff",
-      grid: "#1f1f3f",
-      shadow: "#000000",
-      glow: "#a78bfa",
+      background: "#0a0a1a", surface: "#14142e", primary: "#7c3aed",
+      secondary: "#a78bfa", accent: "#fbbf24", text: "#ffffff",
+      grid: "#1f1f3f", shadow: "#000000", glow: "#a78bfa",
     },
     background: { type: "stars", particles: { count: 80, color: "#ffffff", size: 1, speed: 0.05 } },
     animations: { player: "breathe", food: "glow" },
@@ -263,15 +187,9 @@ export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   },
   forest: {
     colors: {
-      background: "#0f1a0f",
-      surface: "#1a2e1a",
-      primary: "#7ba05b",
-      secondary: "#a3c585",
-      accent: "#e8b84b",
-      text: "#f0f5e8",
-      grid: "#2a3e2a",
-      shadow: "#000000",
-      glow: "#c7e89e",
+      background: "#0f1a0f", surface: "#1a2e1a", primary: "#7ba05b",
+      secondary: "#a3c585", accent: "#e8b84b", text: "#f0f5e8",
+      grid: "#2a3e2a", shadow: "#000000", glow: "#c7e89e",
     },
     background: { type: "solid" },
     animations: { player: "breathe", food: "pulse" },
@@ -279,15 +197,9 @@ export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   },
   candy: {
     colors: {
-      background: "#fff0f6",
-      surface: "#ffe0ec",
-      primary: "#ff6ec7",
-      secondary: "#ffb3e0",
-      accent: "#7ee8fa",
-      text: "#5a2a4a",
-      grid: "#ffd0e0",
-      shadow: "#e0a0c0",
-      glow: "#ffb3e0",
+      background: "#fff0f6", surface: "#ffe0ec", primary: "#ff6ec7",
+      secondary: "#ffb3e0", accent: "#7ee8fa", text: "#5a2a4a",
+      grid: "#ffd0e0", shadow: "#e0a0c0", glow: "#ffb3e0",
     },
     background: { type: "particles", particles: { count: 20, color: "#ffb3e0", size: 4, speed: 0.1, shape: "circle" } },
     animations: { player: "bounce", food: "pulse" },
@@ -295,15 +207,9 @@ export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   },
   cyberpunk: {
     colors: {
-      background: "#0d0221",
-      surface: "#1a0a2e",
-      primary: "#ff006e",
-      secondary: "#ff4d94",
-      accent: "#00f5ff",
-      text: "#ffffff",
-      grid: "#2a1a4a",
-      shadow: "#000000",
-      glow: "#00f5ff",
+      background: "#0d0221", surface: "#1a0a2e", primary: "#ff006e",
+      secondary: "#ff4d94", accent: "#00f5ff", text: "#ffffff",
+      grid: "#2a1a4a", shadow: "#000000", glow: "#00f5ff",
     },
     background: { type: "particles", particles: { count: 60, color: "#00f5ff", size: 2, speed: 0.3 } },
     animations: { player: "glow", food: "pulse" },
@@ -311,15 +217,9 @@ export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   },
   papercraft: {
     colors: {
-      background: "#f4e8d0",
-      surface: "#e8d8b8",
-      primary: "#8b6f47",
-      secondary: "#b89770",
-      accent: "#c25e3a",
-      text: "#3a2e1f",
-      grid: "#d4c4a0",
-      shadow: "#b8a080",
-      glow: "#e8c080",
+      background: "#f4e8d0", surface: "#e8d8b8", primary: "#8b6f47",
+      secondary: "#b89770", accent: "#c25e3a", text: "#3a2e1f",
+      grid: "#d4c4a0", shadow: "#b8a080", glow: "#e8c080",
     },
     background: { type: "solid" },
     animations: { player: "breathe", food: "pulse" },
@@ -327,15 +227,9 @@ export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   },
   nature: {
     colors: {
-      background: "#e8f0e0",
-      surface: "#d0e0c0",
-      primary: "#5a7f3a",
-      secondary: "#8fb56a",
-      accent: "#d4691c",
-      text: "#2a3a1a",
-      grid: "#c0d4a8",
-      shadow: "#a0b890",
-      glow: "#c8e0a0",
+      background: "#e8f0e0", surface: "#d0e0c0", primary: "#5a7f3a",
+      secondary: "#8fb56a", accent: "#d4691c", text: "#2a3a1a",
+      grid: "#c0d4a8", shadow: "#a0b890", glow: "#c8e0a0",
     },
     background: { type: "solid" },
     animations: { player: "breathe", food: "pulse" },
@@ -343,12 +237,9 @@ export const STYLE_PRESETS: Record<StylePreset, Partial<GameConfig>> = {
   },
 };
 
-// ─────────────────────────────────────────────────────────────
-// ДЕФОЛТНЫЙ КОНФИГ
-// ─────────────────────────────────────────────────────────────
-
 export function defaultConfig(genre: Genre): GameConfig {
   const preset = STYLE_PRESETS.cozy;
+  const emojis = defaultEmojisForGenre(genre);
   return {
     title: "Игра",
     subtitle: "BGen",
@@ -357,9 +248,9 @@ export function defaultConfig(genre: Genre): GameConfig {
     colors: preset.colors!,
     background: preset.background,
     sprites: {
-      player: { type: "shape", shape: "roundedSquare", size: 0.85, color: preset.colors!.primary, outline: { width: 2, color: "#00000020" } },
-      food: { type: "shape", shape: "circle", size: 0.7, color: preset.colors!.accent },
-      obstacle: { type: "shape", shape: "triangle", size: 0.8, color: "#666666" },
+      player: { type: "emoji", emoji: emojis.player },
+      food: { type: "emoji", emoji: emojis.food },
+      obstacle: emojis.obstacle ? { type: "emoji", emoji: emojis.obstacle } : undefined,
     },
     animations: preset.animations,
     texts: {
@@ -383,10 +274,6 @@ export function defaultConfig(genre: Genre): GameConfig {
     wrapAroundWalls: false,
   };
 }
-
-// ─────────────────────────────────────────────────────────────
-// НОРМАЛИЗАЦИЯ КОНФИГА ОТ LLM
-// ─────────────────────────────────────────────────────────────
 
 export function normalizeConfig(raw: any, genre: Genre): GameConfig {
   const def = defaultConfig(genre);
@@ -441,24 +328,33 @@ export function normalizeConfig(raw: any, genre: Genre): GameConfig {
     return presets.includes(v) ? v : undefined;
   };
 
-  // Определяем стиль-пресет (если задан, берём его базу)
   const stylePreset = validPreset(raw.stylePreset);
   const baseConfig = stylePreset ? { ...def, ...STYLE_PRESETS[stylePreset], stylePreset } : def;
-
-  // Цвета — из raw, потом из пресета, потом дефолт
   const colors = raw.colors && typeof raw.colors === "object" ? raw.colors : {};
   const baseColors = baseConfig.colors;
+  const defaultEmojis = defaultEmojisForGenre(genre);
 
-  // Спрайты
   const rawSprites = raw.sprites && typeof raw.sprites === "object" ? raw.sprites : {};
+
   const sprites = {
-    player: normalizeSprite(rawSprites.player, def.sprites!.player!, baseColors.primary),
-    food: normalizeSprite(rawSprites.food, def.sprites!.food!, baseColors.accent),
-    obstacle: normalizeSprite(rawSprites.obstacle, def.sprites!.obstacle!, "#666666"),
-    powerup: rawSprites.powerup ? normalizeSprite(rawSprites.powerup, undefined, baseColors.secondary ?? baseColors.primary) : undefined,
+    player: normalizeSprite(
+      rawSprites.player,
+      { type: "emoji", emoji: defaultEmojis.player },
+      baseColors.primary,
+    ),
+    food: normalizeSprite(
+      rawSprites.food,
+      { type: "emoji", emoji: defaultEmojis.food },
+      baseColors.accent,
+    ),
+    obstacle: defaultEmojis.obstacle
+      ? normalizeSprite(rawSprites.obstacle, { type: "emoji", emoji: defaultEmojis.obstacle }, "#666666")
+      : undefined,
+    powerup: rawSprites.powerup
+      ? normalizeSprite(rawSprites.powerup, undefined, baseColors.secondary ?? baseColors.primary)
+      : undefined,
   };
 
-  // Анимации
   const rawAnims = raw.animations && typeof raw.animations === "object" ? raw.animations : {};
   const animations: AnimationsConfig = {
     player: validAnim(rawAnims.player, baseConfig.animations?.player ?? "none"),
@@ -467,7 +363,6 @@ export function normalizeConfig(raw: any, genre: Genre): GameConfig {
     powerup: rawAnims.powerup ? validAnim(rawAnims.powerup, "none") : undefined,
   };
 
-  // Тексты
   const rawTexts = raw.texts && typeof raw.texts === "object" ? raw.texts : {};
   const texts: GameTexts = {
     startTitle: safeStr(rawTexts.startTitle, def.texts?.startTitle ?? "", 40) || undefined,
@@ -481,7 +376,6 @@ export function normalizeConfig(raw: any, genre: Genre): GameConfig {
     tutorial: safeStr(rawTexts.tutorial, "", 120) || undefined,
   };
 
-  // Фон
   const rawBg = raw.background && typeof raw.background === "object" ? raw.background : {};
   const background: BackgroundConfig = {
     type: validBgType(rawBg.type, baseConfig.background?.type ?? "solid"),
@@ -499,7 +393,6 @@ export function normalizeConfig(raw: any, genre: Genre): GameConfig {
     } : baseConfig.background?.particles,
   };
 
-  // Аудио
   const rawAudio = raw.audio && typeof raw.audio === "object" ? raw.audio : {};
   const baseAudio = baseConfig.audio ?? { enabled: false };
   const audio: GameAudio = {
@@ -548,17 +441,18 @@ export function normalizeConfig(raw: any, genre: Genre): GameConfig {
 function normalizeSprite(raw: any, def: SpriteConfig | undefined, defaultColor: string): SpriteConfig | undefined {
   if (!raw || typeof raw !== "object") return def;
   const type = ["emoji", "shape", "pixel", "svg", "none"].includes(raw.type) ? raw.type : (def?.type ?? "shape");
-
   const base: SpriteConfig = { type };
 
   if (type === "emoji") {
-    base.emoji = typeof raw.emoji === "string" ? raw.emoji.slice(0, 8) : (def?.emoji ?? "⭐");
+    base.emoji = typeof raw.emoji === "string" && raw.emoji.trim()
+      ? raw.emoji.slice(0, 8)
+      : (def?.emoji ?? "⭐");
   } else if (type === "shape") {
     const shapes = ["circle", "square", "roundedSquare", "triangle", "hexagon", "star", "diamond"];
     base.shape = shapes.includes(raw.shape) ? raw.shape : (def?.shape ?? "circle");
     base.size = typeof raw.size === "number" ? Math.max(0.3, Math.min(1.2, raw.size)) : (def?.size ?? 0.8);
-    base.color = typeof raw.color === "string" && /^#?[0-9a-fA-F]{6,8}$/.test(raw.color.replace("#", "")) 
-      ? `#${raw.color.replace("#", "")}` 
+    base.color = typeof raw.color === "string" && /^#?[0-9a-fA-F]{6,8}$/.test(raw.color.replace("#", ""))
+      ? `#${raw.color.replace("#", "")}`
       : defaultColor;
     if (raw.outline) {
       base.outline = {
@@ -579,7 +473,6 @@ function normalizeSprite(raw: any, def: SpriteConfig | undefined, defaultColor: 
         grid,
       };
     } else {
-      // Если pixel не задан — откатываемся на shape
       base.type = "shape";
       base.shape = "roundedSquare";
       base.size = 0.85;

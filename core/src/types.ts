@@ -1,13 +1,6 @@
 /**
- * BGen Core — базовые типы гипер-ядра.
- *
- * Здесь описаны все сущности, которыми оперируют модули:
- * classifier → compiler → router → analyzer → repair → cache.
+ * BGen Core — базовые типы.
  */
-
-// ─────────────────────────────────────────────────────────────
-// Жанры
-// ─────────────────────────────────────────────────────────────
 
 export type Genre =
   | "snake"
@@ -20,37 +13,18 @@ export type Genre =
   | "breakout"
   | "2048"
   | "tower"
+  | "racing"
+  | "fighting"
+  | "tanks"
+  | "tictactoe"
   | "unknown";
-
-// ─────────────────────────────────────────────────────────────
-// Аудитория
-// ─────────────────────────────────────────────────────────────
 
 export type Audience = "default" | "elderly" | "kids" | "hardcore";
 
-// ─────────────────────────────────────────────────────────────
-// Механики
-// ─────────────────────────────────────────────────────────────
-
 export type Mechanic =
-  | "grow"
-  | "collect"
-  | "avoid"
-  | "jump"
-  | "match"
-  | "tap"
-  | "drag"
-  | "swipe"
-  | "combo"
-  | "timer"
-  | "levels"
-  | "upgrade"
-  | "score"
-  | "lives";
-
-// ─────────────────────────────────────────────────────────────
-// Ограничения
-// ─────────────────────────────────────────────────────────────
+  | "grow" | "collect" | "avoid" | "jump" | "match" | "tap"
+  | "drag" | "swipe" | "combo" | "timer" | "levels" | "upgrade"
+  | "score" | "lives";
 
 export interface Constraints {
   mobile?: boolean;
@@ -61,10 +35,6 @@ export interface Constraints {
   noSound?: boolean;
 }
 
-// ─────────────────────────────────────────────────────────────
-// GameSpec
-// ─────────────────────────────────────────────────────────────
-
 export interface GameSpec {
   genre: Genre;
   audience: Audience;
@@ -74,10 +44,6 @@ export interface GameSpec {
   rawPrompt: string;
   confidence: number;
 }
-
-// ─────────────────────────────────────────────────────────────
-// Вход / выход ядра
-// ─────────────────────────────────────────────────────────────
 
 export interface UserInput {
   prompt: string;
@@ -99,35 +65,17 @@ export interface GenerateOptions {
 }
 
 export interface GenerateResult {
-  /** Итоговый self-contained HTML игры */
   html: string;
-  /** Спека, по которой генерировали */
   spec: GameSpec;
-  /** Сколько попыток потребовалось */
   attempts: number;
-  /** Провайдер, отдавший финальный ответ */
   provider: string;
-  /** Предупреждения анализатора (не критичные) */
   warnings: string[];
-  /** Ошибки, которые чинили по пути */
   repairedErrors: string[];
-  /** Взято из кэша */
   fromCache: boolean;
-  /**
-   * Итоговый статус генерации:
-   *   true  — все критические проверки пройдены
-   *   false — после N попыток остались критические ошибки
-   */
   ok: boolean;
-  /** Примерное количество токенов */
   tokensUsed?: number;
-  /** Длительность в мс */
   durationMs: number;
 }
-
-// ─────────────────────────────────────────────────────────────
-// Промпт после компиляции
-// ─────────────────────────────────────────────────────────────
 
 export interface CompiledPrompt {
   system: string;
@@ -135,10 +83,6 @@ export interface CompiledPrompt {
   spec: GameSpec;
   examplesUsed: number;
 }
-
-// ─────────────────────────────────────────────────────────────
-// Анализ кода
-// ─────────────────────────────────────────────────────────────
 
 export interface InvariantIssue {
   id: string;
@@ -156,10 +100,6 @@ export interface AnalysisReport {
   size: number;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Провайдеры LLM
-// ─────────────────────────────────────────────────────────────
-
 export interface LLMRequest {
   system: string;
   user: string;
@@ -175,20 +115,12 @@ export interface LLMProvider {
   generateStream?(req: LLMRequest, onChunk: (t: string) => void): Promise<string>;
 }
 
-// ─────────────────────────────────────────────────────────────
-// Cache
-// ─────────────────────────────────────────────────────────────
-
 export interface CacheEntry {
   html: string;
   spec: GameSpec;
   createdAt: number;
   hits: number;
 }
-
-// ─────────────────────────────────────────────────────────────
-// Ошибки
-// ─────────────────────────────────────────────────────────────
 
 export class BGenError extends Error {
   constructor(
