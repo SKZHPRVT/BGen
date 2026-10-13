@@ -18,63 +18,34 @@
 </head>
 <body>
 
-  <!-- =========================================== -->
-  <!-- ПРЕЛОАДЕР 1: СТАРТОВЫЙ (при открытии)         -->
-  <!-- Шарик + [BE......] + GEN                      -->
-  <!-- =========================================== -->
+  <!-- ПРЕЛОАДЕР 1: СТАРТОВЫЙ -->
   <div id="preloader" class="preloader">
     <div class="preloader-content">
       <canvas id="bee-ball" class="bee-ball" width="480" height="480"></canvas>
-
       <div class="bee-block">
         <div class="bee-bar">
           <span class="bee-bracket">[</span>
           <span id="bee-letters" class="bee-letters"></span>
           <span class="bee-bracket">]</span>
         </div>
-
         <div id="bee-gen" class="bee-gen"></div>
       </div>
     </div>
   </div>
 
-  <!-- =========================================== -->
-  <!-- ЭКРАН 1: СТАРТ                                -->
-  <!-- =========================================== -->
+  <!-- ЭКРАН 1: СТАРТ -->
   <section id="screen-start" class="screen screen-start" hidden>
     <div class="screen-inner">
       <h1 class="hero-title">Создай игру</h1>
       <p class="hero-subtitle">Опиши идею — ИИ сделает игру за 30-60 секунд</p>
 
-      <textarea
-        id="promptInput"
-        class="prompt-input"
-        placeholder="замути змейку для бабушки"
-        rows="3"
-        maxlength="500"
-      ></textarea>
+      <textarea id="promptInput" class="prompt-input" placeholder="замути змейку для бабушки" rows="3" maxlength="500"></textarea>
 
       <div class="mode-picker">
-        <label class="mode-option">
-          <input type="radio" name="audience" value="default" checked>
-          <span class="mode-icon">🎯</span>
-          <span class="mode-label">Обычная</span>
-        </label>
-        <label class="mode-option">
-          <input type="radio" name="audience" value="elderly">
-          <span class="mode-icon">👵</span>
-          <span class="mode-label">Для бабушки</span>
-        </label>
-        <label class="mode-option">
-          <input type="radio" name="audience" value="kids">
-          <span class="mode-icon">🧒</span>
-          <span class="mode-label">Для детей</span>
-        </label>
-        <label class="mode-option">
-          <input type="radio" name="audience" value="hardcore">
-          <span class="mode-icon">🔥</span>
-          <span class="mode-label">Хардкор</span>
-        </label>
+        <label class="mode-option"><input type="radio" name="audience" value="default" checked><span class="mode-icon">🎯</span><span class="mode-label">Обычная</span></label>
+        <label class="mode-option"><input type="radio" name="audience" value="elderly"><span class="mode-icon">👵</span><span class="mode-label">Для бабушки</span></label>
+        <label class="mode-option"><input type="radio" name="audience" value="kids"><span class="mode-icon">🧒</span><span class="mode-label">Для детей</span></label>
+        <label class="mode-option"><input type="radio" name="audience" value="hardcore"><span class="mode-icon">🔥</span><span class="mode-label">Хардкор</span></label>
       </div>
 
       <button id="startBtn" class="btn-primary">
@@ -90,13 +61,9 @@
     </div>
   </section>
 
-  <!-- =========================================== -->
-  <!-- ПРЕЛОАДЕР 2: ГЕНЕРАЦИЯ (при создании игры)    -->
-  <!-- Шарик + [BE......] внизу + текст              -->
-  <!-- =========================================== -->
+  <!-- ПРЕЛОАДЕР 2: ГЕНЕРАЦИЯ -->
   <section id="screen-loading" class="screen screen-loading" hidden>
     <canvas id="chaos-canvas" class="chaos-canvas"></canvas>
-
     <div class="loading-bottom">
       <div class="loading-hint">Генерирую игру…</div>
       <div class="loading-bee">
@@ -107,23 +74,26 @@
     </div>
   </section>
 
-  <!-- =========================================== -->
-  <!-- ЭКРАН 3: ИГРА (на весь экран)                -->
-  <!-- =========================================== -->
+  <!-- ЭКРАН 3: ИГРА -->
   <section id="screen-game" class="screen screen-game" hidden>
-    <iframe
-      id="gameFrame"
-      class="game-frame-fullscreen"
-      sandbox="allow-scripts"
-      title="Сгенерированная игра"
-    ></iframe>
+    <iframe id="gameFrame" class="game-frame-fullscreen" sandbox="allow-scripts" title="Сгенерированная игра"></iframe>
+
+    <!-- СОЛОНКА: панель управления поверх игры -->
+    <div id="gameControls" class="game-controls" style="display:none">
+      <div class="controls-dpad">
+        <button id="ctrlLeft" class="ctrl-btn" aria-label="Влево">◀</button>
+        <button id="ctrlUp" class="ctrl-btn" aria-label="Вверх">▲</button>
+        <button id="ctrlDown" class="ctrl-btn" aria-label="Вниз">▼</button>
+        <button id="ctrlRight" class="ctrl-btn" aria-label="Вправо">▶</button>
+      </div>
+      <button id="ctrlTap" class="ctrl-btn ctrl-btn-tap" aria-label="Тап">TAP</button>
+      <button id="ctrlRestart" class="ctrl-btn ctrl-btn-restart" aria-label="Заново">⟳</button>
+    </div>
 
     <button id="settingsBtn" class="float-settings-btn" title="Настройки">⚙</button>
   </section>
 
-  <!-- =========================================== -->
-  <!-- МОДАЛ НАСТРОЕК                                -->
-  <!-- =========================================== -->
+  <!-- МОДАЛ НАСТРОЕК -->
   <div id="settingsModal" class="modal" hidden>
     <div class="modal-backdrop"></div>
     <div class="modal-panel">
@@ -131,41 +101,27 @@
         <span class="modal-title">Настройки</span>
         <button id="modalClose" class="modal-close">✕</button>
       </div>
-
       <div class="modal-body">
         <div class="modal-meta" id="modalMeta">—</div>
-
         <div class="modal-section">
           <label class="modal-label">🔧 Доработать</label>
-          <textarea
-            id="iterateInput"
-            class="modal-input"
-            placeholder="сделай кнопки больше / добавь уровни..."
-            rows="2"
-            maxlength="200"
-          ></textarea>
+          <textarea id="iterateInput" class="modal-input" placeholder="сделай кнопки больше / добавь уровни..." rows="2" maxlength="200"></textarea>
           <button id="iterateBtn" class="modal-btn modal-btn-primary">Доработать</button>
         </div>
-
         <div class="modal-section modal-actions">
           <button id="exportBtn" class="modal-btn">⬇ Скачать .html</button>
           <button id="shareBtn" class="modal-btn">↗ Поделиться</button>
           <button id="restartBtn" class="modal-btn">⟳ Начать заново</button>
           <button id="fullscreenBtn" class="modal-btn">⛶ На весь экран</button>
         </div>
-
         <div class="modal-section">
-          <button id="newGameBtn" class="modal-btn modal-btn-primary">
-            ✨ Создать новую игру
-          </button>
+          <button id="newGameBtn" class="modal-btn modal-btn-primary">✨ Создать новую игру</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- =========================================== -->
-  <!-- МОДАЛ «ВСЕ ИГРЫ»                              -->
-  <!-- =========================================== -->
+  <!-- МОДАЛ ИГР -->
   <div id="gamesModal" class="modal" hidden>
     <div class="modal-backdrop"></div>
     <div class="modal-panel">
@@ -175,9 +131,7 @@
       </div>
       <div class="modal-body">
         <div id="gamesList" class="games-list"></div>
-        <button id="gamesNewBtn" class="modal-btn modal-btn-primary" style="margin-top:16px">
-          ✨ Создать новую игру
-        </button>
+        <button id="gamesNewBtn" class="modal-btn modal-btn-primary" style="margin-top:16px">✨ Создать новую игру</button>
       </div>
     </div>
   </div>

@@ -1,9 +1,5 @@
 /**
  * Игровые инварианты.
- *
- * Severity:
- *   error   — блокирует приёмку, запускает repair loop
- *   warning — не блокирует, идёт в UI как замечание
  */
 import type { InvariantIssue } from "../types.ts";
 import type { MiniAst } from "./miniAst.ts";
@@ -13,7 +9,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   const html = ast.raw;
 
   // ─────────────────────────────────────────────────────────────
-  // Canvas: должен быть на весь экран
+  // Canvas: должен быть на весь экран (не Math.min)
   // ─────────────────────────────────────────────────────────────
   const hardcodedCanvasSize =
     /canvas\.width\s*=\s*\d{2,4}\s*;/i.test(html) ||
@@ -23,12 +19,21 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     /canvas\.(width|height)\s*=\s*(window\.)?inner(Width|Height)/i.test(html) ||
     /canvas\.(width|height)\s*=\s*document\.(documentElement\.)?client(Width|Height)/i.test(html);
 
-  if (ast.hasCanvas && hardcodedCanvasSize && !hasInnerSize) {
+  const usesMathMin = /canvas\.(width|height)\s*=\s*(canvas\.(width|height)\s*=\s*)?Math\.min\s*\(\s*(window\.)?inner/i.test(html);
+
+  if (usesMathMin) {
+    issues.push({
+      id: "canvas-quadratic",
+      severity: "error",
+      message: "Canvas как Math.min(innerWidth, innerHeight) — квадрат вместо прямоугольника",
+      hint: "canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;",
+    });
+  } else if (ast.hasCanvas && hardcodedCanvasSize && !hasInnerSize) {
     issues.push({
       id: "hardcoded-canvas-size",
       severity: "error",
-      message: "Canvas размер задан хардкодом, а не под экран",
-      hint: "canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr; + addEventListener('resize')",
+      message: "Canvas размер задан хардкодом",
+      hint: "canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;",
     });
   }
 
@@ -47,82 +52,84 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // CSS: calc() без пробелов вокруг операторов
+  // THROTTLE — критично для змейки/раннера/платформера
   // ─────────────────────────────────────────────────────────────
-  // Невалидно: calc(50%-50vw), calc(100%-20px)
+  const hasSetInterval = /setInterval\s*\(/i.test(html);
+  const hasThrottleByTime =
+    /performance\.now\(\)\s*-\s*(last|prev|previous)/i.test(html) ||
+    /\bt\s*-\s*(last|prev|previous)\w*\s*>/i.test(html);
+  const hasTimerVariable = /\b(lastMove|lastUpdate|lastTick|lastStep)/i.test(html);
+
+  // Только для игр, где важно движение по шагам (змейка, раннер, платформер, breakout)
+  // Кликеры и головоломки — не подпадают
+  const needsThrottle =
+    /snake|змейк|runner|раннер|breakout|арканоид|platformer|платформер/i.test(html) ||
+    /\b(unshift|pop)\s*\(/.test(html); // движения через массив — характерно для змейки
+
+  if (needsThrottle && !hasSetInterval && !hasThrottleByTime && !hasTimerVariable) {
+    issues.push({
+      id: "no-throttle",
+      severity: "error",
+      message: "Движение без throttle — объект двигается 60 раз в секунду",
+      hint:
+        "Используй: let lastMove = 0; const MOVE_MS = 200; " +
+        "function loop(t) { if (t - lastMove > MOVE_MS) { lastMove = t; move(); } render(); requestAnimationFrame(loop); } " +
+        "Для 'пожилые' MOVE_MS = 250-300, для 'обычная' = 130-150.",
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // POSTMESSAGE — критично, игра должна слушать родителя
+  // ─────────────────────────────────────────────────────────────
+  const hasPostMessageListener = /addEventListener\s*\(\s*['"]message['"]/i.test(html);
+  const handlesBgenInput = /bgen:input/i.test(html);
+
+  if (!hasPostMessageListener) {
+    issues.push({
+      id: "no-postmessage",
+      severity: "error",
+      message: "Игра не слушает postMessage от приложения BGen",
+      hint:
+        "window.addEventListener('message', function(event) { " +
+        "const data = event.data; if (!data || data.type !== 'bgen:input') return; " +
+        "switch(data.action) { case 'left': setDir('left'); break; ... } })",
+    });
+  } else if (!handlesBgenInput) {
+    issues.push({
+      id: "no-bgen-input",
+      severity: "warning",
+      message: "postMessage есть, но не обрабатывает bgen:input",
+      hint: "Проверь: if (event.data.type !== 'bgen:input') return;",
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Свои кнопки внутри игры — не нужны
+  // ─────────────────────────────────────────────────────────────
+  const hasOwnControls =
+    /<div[^>]*id\s*=\s*["']controls["']/i.test(html) ||
+    /<button[^>]*>[◀▲▼▶]/i.test(html);
+
+  if (hasOwnControls) {
+    issues.push({
+      id: "has-own-controls",
+      severity: "warning",
+      message: "Игра содержит свои кнопки управления — не нужно",
+      hint: "Управление идёт через postMessage от родителя. Убери свои кнопки.",
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // CSS calc без пробелов
+  // ─────────────────────────────────────────────────────────────
   const badCalc = /calc\([^)]*\d(%|px|vw|vh|em|rem)?\s*[+\-*/]\s*\d/i.test(html);
   const goodCalcSpacing = /calc\([^)]*\d(%|px|vw|vh|em|rem)?\s+[+\-*/]\s+\d/i.test(html);
   if (badCalc && !goodCalcSpacing) {
     issues.push({
       id: "invalid-calc-syntax",
       severity: "error",
-      message: "calc() без пробелов вокруг оператора — невалидный CSS",
-      hint: "В calc() пробелы обязательны: calc(50% - 50vw), calc(100% - 20px)",
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // Кнопки управления: #controls должен быть flex
-  // ─────────────────────────────────────────────────────────────
-  const hasControlsButtons =
-    /<div[^>]*id\s*=\s*["']controls["']/i.test(html) ||
-    /<button[^>]*>\s*[◀▲▼▶←↑↓→]/i.test(html);
-
-  if (hasControlsButtons) {
-    const controlsIsFlex = /#controls\s*\{[^}]*display\s*:\s*(flex|grid)/i.test(html);
-    const controlsIsFixed = /#controls\s*\{[^}]*position\s*:\s*fixed/i.test(html);
-
-    if (!controlsIsFlex) {
-      issues.push({
-        id: "controls-no-flex",
-        severity: "error",
-        message: "Кнопки управления без flex/grid контейнера",
-        hint: "#controls { display: flex; position: fixed; bottom: ...; left: 50%; transform: translateX(-50%); gap: 16px; }",
-      });
-    }
-    if (!controlsIsFixed) {
-      issues.push({
-        id: "controls-not-fixed",
-        severity: "warning",
-        message: "#controls без position: fixed",
-        hint: "Кнопки должны быть зафиксированы внизу: position: fixed; bottom: ...;",
-      });
-    }
-
-    // Каждая кнопка внутри #controls не должна иметь position: fixed
-    const buttonHasFixed = /#controls\s+button\s*\{[^}]*position\s*:\s*fixed/i.test(html);
-    if (buttonHasFixed) {
-      issues.push({
-        id: "button-position-fixed",
-        severity: "error",
-        message: "Каждая кнопка с position: fixed — они наложатся друг на друга",
-        hint: "position: fixed только у #controls (родителя). Кнопки — обычные flex-элементы.",
-      });
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // Сравнение textContent с HTML-entity
-  // ─────────────────────────────────────────────────────────────
-  if (/textContent\s*===?\s*['"`]&[a-z]+;['"`]/i.test(html)) {
-    issues.push({
-      id: "textcontent-vs-entity",
-      severity: "error",
-      message: "Сравнение textContent с HTML-entity — не сработает",
-      hint: "textContent возвращает символ (◀), а не entity (&larr;). Используй data-dir или id кнопки.",
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // HTML-entities стрелок — запрещены
-  // ─────────────────────────────────────────────────────────────
-  const badEntities = /&(uarr|darr|larr|rarr|upp|dow|left|right);/i;
-  if (badEntities.test(html)) {
-    issues.push({
-      id: "bad-arrow-entities",
-      severity: "error",
-      message: "Неправильные HTML-entities для стрелок",
-      hint: "Используй символы напрямую: ◀ ▲ ▼ ▶",
+      message: "calc() без пробелов вокруг оператора",
+      hint: "calc(50% - 50vw), calc(100% - 20px) — с пробелами",
     });
   }
 
@@ -133,28 +140,19 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     issues.push({
       id: "no-game-loop",
       severity: "error",
-      message: "Нет игрового цикла (requestAnimationFrame / setInterval)",
-      hint: "Добавь requestAnimationFrame(loop) и вызывай рекурсивно.",
+      message: "Нет игрового цикла",
+      hint: "Добавь requestAnimationFrame(loop).",
     });
   }
 
   // Ввод
-  const hasAnyInput = ast.hasKeydown || ast.hasTouch || ast.hasMouse;
+  const hasAnyInput = ast.hasKeydown || ast.hasTouch || ast.hasMouse || hasPostMessageListener;
   if (!hasAnyInput) {
     issues.push({
       id: "no-input",
       severity: "error",
       message: "Нет ни одного обработчика ввода",
-      hint: "Добавь addEventListener для keydown, touchstart и pointerdown/click.",
-    });
-  }
-
-  if (!ast.hasTouch) {
-    issues.push({
-      id: "no-touch",
-      severity: "warning",
-      message: "Нет touch-управления",
-      hint: "Добавь touchstart/touchmove/touchend.",
+      hint: "Добавь keydown + postMessage listener.",
     });
   }
 
@@ -164,7 +162,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
       id: "no-state-machine",
       severity: "error",
       message: "Нет явной state machine",
-      hint: "Введи переменную state ('start', 'playing', 'gameover').",
+      hint: "state = 'start' | 'playing' | 'gameover'",
     });
   }
 
@@ -173,7 +171,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     issues.push({
       id: "no-win-lose",
       severity: "warning",
-      message: "Нет явного условия победы/поражения",
+      message: "Нет условия победы/поражения",
       hint: "Для аркад это нормально.",
     });
   }
@@ -182,8 +180,8 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     issues.push({
       id: "no-restart",
       severity: "warning",
-      message: "Нет кнопки/функции рестарта",
-      hint: "Добавь reset() и кнопку «Заново».",
+      message: "Нет функции рестарта",
+      hint: "Добавь reset() и обработку action 'restart'.",
     });
   }
 
@@ -191,8 +189,8 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     issues.push({
       id: "no-resize",
       severity: "warning",
-      message: "Канвас не адаптируется под экран",
-      hint: "Добавь addEventListener('resize', ...).",
+      message: "Canvas не адаптируется под экран",
+      hint: "window.addEventListener('resize', resize)",
     });
   }
 
@@ -200,8 +198,8 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     issues.push({
       id: "no-viewport",
       severity: "warning",
-      message: 'Нет meta name="viewport"',
-      hint: "Добавь meta viewport с width=device-width,initial-scale=1.",
+      message: 'Нет meta viewport',
+      hint: "meta name=viewport с width=device-width,initial-scale=1",
     });
   }
 
@@ -209,13 +207,13 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     issues.push({
       id: "no-score",
       severity: "warning",
-      message: "Не найден счёт/очки",
+      message: "Не найден счёт",
       hint: "Добавь отображение счёта.",
     });
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Игра не должна стартовать в gameover/win
+  // Старт в gameover/win — критично
   // ─────────────────────────────────────────────────────────────
   const head = html.slice(0, 4000);
 
@@ -223,8 +221,8 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     issues.push({
       id: "starts-in-gameover",
       severity: "error",
-      message: "Игра инициализируется в состоянии проигрыша",
-      hint: "Начальное состояние должно быть 'start' или 'playing'.",
+      message: "Игра стартует в состоянии проигрыша",
+      hint: "state = 'start' или 'playing'",
     });
   }
 
@@ -232,33 +230,22 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     issues.push({
       id: "starts-in-win",
       severity: "error",
-      message: "Игра инициализируется в состоянии победы",
-      hint: "Начальное состояние должно быть 'start' или 'playing'.",
+      message: "Игра стартует в состоянии победы",
+      hint: "state = 'start' или 'playing'",
     });
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Функция-обработчик вызывается без event
+  // HTML-entities стрелок — только если есть свои кнопки (warning)
   // ─────────────────────────────────────────────────────────────
-  const handlerNames = [
-    ...html.matchAll(
-      /function\s+(\w*(?:Handle|Input|Key|Touch|Click|Tap|Press)\w*)\s*\(\s*(\w+)\s*\)\s*\{([^}]{0,500})/gi,
-    ),
-  ]
-    .filter((m) => /\b\w+\.(key|touches|clientX|clientY|type)\b/.test(m[3] ?? ""))
-    .map((m) => m[1]);
-
-  for (const name of new Set(handlerNames)) {
-    const badCall = new RegExp(`\\b${name}\\s*\\(\\s*\\)`, "i").test(html);
-    if (badCall) {
-      issues.push({
-        id: "handler-called-without-event",
-        severity: "error",
-        message: `Обработчик ${name}() вызывается без event`,
-        hint: `Функция ${name} должна вызываться только из addEventListener с event.`,
-      });
-      break;
-    }
+  const badEntities = /&(uarr|darr|larr|rarr|upp|dow|left|right);/i;
+  if (badEntities.test(html) && hasOwnControls) {
+    issues.push({
+      id: "bad-arrow-entities",
+      severity: "warning",
+      message: "Неправильные HTML-entities для стрелок",
+      hint: "Убери свои кнопки, используй postMessage",
+    });
   }
 
   return issues;

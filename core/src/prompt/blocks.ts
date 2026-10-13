@@ -11,37 +11,24 @@ export const HARD_RULES_BLOCK = `ЖЁСТКИЕ ПРАВИЛА (нарушени
 2. Всё inline: CSS в <style>, JS в <script>. НИКАКИХ внешних CDN, import, require.
 3. Графика — Canvas 2D. Никаких бинарных ассетов (кроме мелких emoji).
 4. Обязательная структура: start → gameplay → win/lose → restart.
-5. Управление: touch + keyboard + click.
-6. Meta viewport: width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover.
-7. Никаких плейсхолдеров — только рабочий код.
-8. Без ошибок в консоли при запуске.
-9. Никаких alert/confirm/prompt.
-10. Файл ≤ 60 KB.
+5. Meta viewport: width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover.
+6. Без плейсхолдеров — только рабочий код.
+7. Без ошибок в консоли при запуске.
+8. Никаких alert/confirm/prompt.
+9. Файл ≤ 60 KB.
+10. Игра — self-contained, не требует интернета.
 
-CANVAS — ЗАНИМАЕТ ВЕСЬ ЭКРАН:
+═══════════════════════════════════════════
+CANVAS — ЗАНИМАЕТ ВЕСЬ ЭКРАН
+═══════════════════════════════════════════
 
 11. HTML: <canvas id="game"></canvas> — без фиксированных width/height.
 
 12. CSS:
-    html, body {
-      margin: 0; padding: 0;
-      width: 100%; height: 100%;
-      overflow: hidden;
-      background: #111;
-      touch-action: none;
-      overscroll-behavior: none;
-    }
-    canvas {
-      display: block;
-      position: fixed;
-      top: 0; left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: #000;
-      touch-action: none;
-    }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #111; touch-action: none; overscroll-behavior: none; }
+    canvas { display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; touch-action: none; }
 
-13. В JS настрой canvas при старте:
+13. В JS настрой canvas:
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     function resize() {
@@ -55,153 +42,169 @@ CANVAS — ЗАНИМАЕТ ВЕСЬ ЭКРАН:
     resize();
     window.addEventListener('resize', resize);
 
-14. НИКОГДА не пиши canvas.width = 400; используй window.innerWidth.
+14. НИКОГДА не используй Math.min(innerWidth, innerHeight) для canvas.
+    Всегда: canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;
 
-КОНТРОЛЛЕРЫ УПРАВЛЕНИЯ — ОЧЕНЬ ВАЖНО:
+15. НИКОГДА не пиши canvas.width = 400, 600, 800. Только window.innerWidth.
 
-15. HTML кнопок — используй id или data-атрибут:
-    <div id="controls">
-      <button id="btnLeft" data-dir="left">◀</button>
-      <button id="btnUp" data-dir="up">▲</button>
-      <button id="btnDown" data-dir="down">▼</button>
-      <button id="btnRight" data-dir="right">▶</button>
-    </div>
+═══════════════════════════════════════════
+ДВИЖЕНИЕ И THROTTLE — ОЧЕНЬ ВАЖНО
+═══════════════════════════════════════════
 
-16. CSS для #controls — ОБЯЗАТЕЛЬНО flex:
-    #controls {
-      position: fixed;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 16px;
-      z-index: 10;
-    }
-    #controls button {
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.15);
-      border: 2px solid rgba(255,255,255,0.4);
-      color: #fff;
-      font-size: 28px;
-      touch-action: manipulation;
-      user-select: none;
-      cursor: pointer;
-    }
-    #controls button:active {
-      background: rgba(255,255,255,0.35);
-    }
+16. НЕ двигай игровые объекты каждый кадр! Используй throttle по времени:
 
-17. ЗАПРЕЩЕНО ставить каждой кнопке position: fixed. Позиционируй через родитель #controls (flex).
+    let lastMove = 0;
+    const MOVE_INTERVAL_MS = 200; // см. п.17
 
-18. В JS — обработчики через id или data-dir:
-    document.getElementById('btnLeft').addEventListener('click', () => setDir('left'));
-    document.getElementById('btnUp').addEventListener('click', () => setDir('up'));
-    document.getElementById('btnDown').addEventListener('click', () => setDir('down'));
-    document.getElementById('btnRight').addEventListener('click', () => setDir('right'));
-
-    // ИЛИ через data-атрибут:
-    // document.querySelectorAll('#controls button').forEach(btn => {
-    //   btn.addEventListener('click', () => setDir(btn.dataset.dir));
-    // });
-
-19. ЗАПРЕЩЕНО сравнивать event.target.textContent === '&larr;'. 
-    textContent возвращает символ (◀), а не HTML-entity (&larr;).
-    Используй data-dir или id.
-
-20. Используй ТОЛЬКО символы для стрелок: ◀ ▲ ▼ ▶
-    ЗАПРЕЩЕНЫ HTML-entities: &larr; &uarr; &darr; &rarr; &upp; &dow;
-
-CSS SYNTAX — ВАЖНО:
-
-21. В calc() пробелы вокруг операторов ОБЯЗАТЕЛЬНЫ:
-    ПРАВИЛЬНО: calc(50% - 50vw), calc(100% - 20px)
-    НЕПРАВИЛЬНО: calc(50%-50vw), calc(100%-20px) — невалидный CSS!
-
-ЛОГИКА ИГРЫ:
-
-22. Игра СРАЗУ начинается в состоянии 'playing' (не 'start'), 
-    ИЛИ есть стартовый экран с кнопкой «Начать».
-    Игра НЕ должна запускаться в 'gameover'.
-
-23. Игровой цикл:
-    function loop() {
-      update();
+    function loop(t) {
+      if (t - lastMove > MOVE_INTERVAL_MS) {
+        lastMove = t;
+        moveSnake();  // шаг игры
+      }
       render();
       requestAnimationFrame(loop);
     }
-    loop();  // или requestAnimationFrame(loop)
+    requestAnimationFrame(loop);
 
-24. Рестарт: функция reset() возвращает игру в playing:
+17. Интервал движения зависит от аудитории:
+    - "пожилые" (elderly): 250-300 ms — медленно!
+    - "обычная" (default): 130-150 ms
+    - "дети" (kids): 150-180 ms
+    - "хардкор" (hardcore): 70-90 ms — быстро
+
+18. НЕ используй update(dt) без throttle. Просто вызывай move() только когда прошло MOVE_INTERVAL_MS.
+
+19. Для кликеров throttle НЕ нужен — там тап-события.
+
+20. Для раннеров, платформеров — используй физику с dt, но:
+    - update(dt) где dt — секунды
+    - движение = speed * dt
+    - не привязывай к кадрам
+
+═══════════════════════════════════════════
+УПРАВЛЕНИЕ — ВНЕШНИЕ КНОПКИ ПРИЛОЖЕНИЯ
+═══════════════════════════════════════════
+
+ВАЖНО: игра запускается в iframe внутри приложения BGen.
+Приложение BGen показывает свои кнопки управления поверх игры.
+Игра ДОЛЖНА слушать postMessage от родителя.
+
+21. Слушай postMessage от родителя:
+    window.addEventListener('message', function(event) {
+      const data = event.data;
+      if (!data || data.type !== 'bgen:input') return;
+      
+      const action = data.action; // 'left' | 'right' | 'up' | 'down' | 'tap' | 'restart' | 'start'
+      
+      switch (action) {
+        case 'left':  setDir('left'); break;
+        case 'right': setDir('right'); break;
+        case 'up':    setDir('up'); break;
+        case 'down':  setDir('down'); break;
+        case 'tap':   onTap(); break;      // для кликеров
+        case 'restart': reset(); break;
+        case 'start': if (state === 'start') reset(); break;
+      }
+    });
+
+22. Управление НЕ должно дублироваться внутри игры. Убери свои кнопки.
+    В игре — только canvas. Всё управление снаружи через postMessage.
+
+23. Клавиатура всё ещё работает для отладки на десктопе:
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowUp' || e.key === 'w') setDir('up');
+      if (e.key === 'ArrowDown' || e.key === 's') setDir('down');
+      if (e.key === 'ArrowLeft' || e.key === 'a') setDir('left');
+      if (e.key === 'ArrowRight' || e.key === 'd') setDir('right');
+    });
+
+24. Для кликеров — тап может быть и внутри игры (canvas.addEventListener('click', onTap)),
+    но дублируй через postMessage 'tap'.
+
+═══════════════════════════════════════════
+ЛОГИКА ИГРЫ
+═══════════════════════════════════════════
+
+25. Игра начинается в state = 'start' (или сразу 'playing' для кликеров).
+    Игра НЕ должна начинаться в 'gameover'.
+
+26. Функция reset() возвращает всё в исходное:
     function reset() {
       snake = [[10,10],[9,10]];
+      food = placeFood();
       score = 0;
+      dir = 'right';
       state = 'playing';
     }
 
-ОБРАБОТКА ВВОДА — ИСПОЛЬЗУЙ ПО ТИПУ КНОПКИ:
-
-25. Направление движения змейки меняется через setDir(dirName):
-    let dir = 'right';
-    let pendingDir = 'right';
-    function setDir(newDir) {
-      // нельзя разворачиваться на 180 градусов
-      if (newDir === 'up' && dir === 'down') return;
-      if (newDir === 'down' && dir === 'up') return;
-      if (newDir === 'left' && dir === 'right') return;
-      if (newDir === 'right' && dir === 'left') return;
-      pendingDir = newDir;
-    }
-    // Применяем pendingDir в момент шага:
-    function move() {
-      dir = pendingDir;
-      // движение...
+27. После reset() — пауза 1.5 секунды перед началом:
+    function reset() {
+      // ... инициализация ...
+      state = 'paused';
+      setTimeout(() => { state = 'playing'; }, 1500);
     }
 
-26. Клавиатура:
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowUp') setDir('up');
-      else if (e.key === 'ArrowDown') setDir('down');
-      else if (e.key === 'ArrowLeft') setDir('left');
-      else if (e.key === 'ArrowRight') setDir('right');
-    });
+═══════════════════════════════════════════
+CANVAS-РИСОВАНИЕ
+═══════════════════════════════════════════
 
-ЧЕК-ЛИСТ ПЕРЕД ОТВЕТОМ:
-- canvas заполняет экран? (canvas.width = window.innerWidth)
-- есть #controls с display:flex?
-- у каждой кнопки есть id или data-dir?
-- кнопки обрабатываются через id, а не textContent?
-- в calc() есть пробелы вокруг операторов?
-- игра начинается в 'playing', не 'gameover'?
-- requestAnimationFrame вызывается рекурсивно?
+28. Всегда рисуй фон первым:
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
 
-Если что-то не так — исправь ПЕРЕД отправкой.`;
+29. Размер игрового поля:
+    - Не хардкодь 400x400
+    - Считай: const cell = Math.min(window.innerWidth, window.innerHeight) / gridSize;
+    - Игровое поле растягивается под экран
+
+30. Для змейки: рисуй head как круг/прямоугольник, body как прямоугольники.
+    Еда — зелёный круг, радиус = cell * 0.3.
+
+═══════════════════════════════════════════
+ЧЕК-ЛИСТ ПЕРЕД ОТВЕТОМ
+═══════════════════════════════════════════
+
+Проверь мысленно:
+[ ] canvas.width = window.innerWidth * dpr (не Math.min!)
+[ ] есть throttle с MOVE_INTERVAL_MS
+[ ] интервал соответствует аудитории (elderly = 250ms)
+[ ] есть window.addEventListener('message', ...) для bgen:input
+[ ] НЕТ своих кнопок в HTML (только canvas)
+[ ] state начинается с 'start' или 'playing'
+[ ] reset() ставит паузу 1.5 сек
+[ ] requestAnimationFrame вызывается рекурсивно
+[ ] есть checkCollision / условие проигрыша
+[ ] есть drawFood / drawSnake / render
+
+Если что-то не так — исправь ПЕРЕД отправкой ответа.`;
 
 export const COMMON_MISTAKES_BLOCK = `ТИПИЧНЫЕ ОШИБКИ (НЕ ПОВТОРЯЙ):
 
-❌ handleInput() без event — падает.
-✅ Только внутри addEventListener.
+❌ update(1/60) вызывается каждый кадр БЕЗ throttle → змейка 60 шагов/сек
+✅ throttle через lastMove = performance.now()
 
-❌ canvas.width = 400 — хардкод.
-✅ canvas.width = window.innerWidth * dpr.
+❌ canvas.width = Math.min(innerWidth, innerHeight) → квадрат
+✅ canvas.width = window.innerWidth * dpr
 
-❌ #controls button { position: fixed } у каждой кнопки.
-✅ #controls { display: flex } + position: fixed на родителе.
+❌ Кнопки внутри игры с position: fixed у каждой
+✅ Своих кнопок НЕТ, управление снаружи через postMessage
 
-❌ event.target.textContent === '&larr;' — не сработает.
-✅ btn.dataset.dir === 'left' или btn.id === 'btnLeft'.
+❌ event.target.textContent === '&larr;'
+✅ postMessage от родителя + проверка action
 
-❌ calc(50%-50vw) — невалидно.
-✅ calc(50% - 50vw).
+❌ calc(50%-50vw) без пробелов
+✅ calc(50% - 50vw)
 
-❌ state = 'gameover' при инициализации.
-✅ state = 'playing'.
+❌ state = 'gameover' при старте
+✅ state = 'start' или 'playing'
+
+❌ Игра сразу после reset() начинает движение
+✅ setTimeout(() => state = 'playing', 1500)
 
 ❌ &larr; &uarr; &darr; &rarr;
-✅ ◀ ▲ ▼ ▶`;
+✅ ◀ ▲ ▼ ▶ (но они и не нужны внутри игры — управление снаружи)`;
 
-export const OUTPUT_FORMAT_BLOCK = `ФОРМАТ: только <!DOCTYPE html>...</html>, ничего до и после.
+export const OUTPUT_FORMAT_BLOCK = `ФОРМАТ: только <!DOCTYPE html>...</html>.
 
 Скелет:
 <!DOCTYPE html>
@@ -211,25 +214,20 @@ export const OUTPUT_FORMAT_BLOCK = `ФОРМАТ: только <!DOCTYPE html>..
   <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <title>Название игры</title>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #111; touch-action: none; }
-    canvas { display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; }
-    #controls { position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); left: 50%; transform: translateX(-50%); display: flex; gap: 16px; z-index: 10; }
-    #controls button { width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.4); color: #fff; font-size: 28px; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #111; touch-action: none; overscroll-behavior: none; }
+    canvas { display: block; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; touch-action: none; }
   </style>
 </head>
 <body>
   <canvas id="game"></canvas>
-  <div id="controls">
-    <button id="btnLeft" data-dir="left">◀</button>
-    <button id="btnUp" data-dir="up">▲</button>
-    <button id="btnDown" data-dir="down">▼</button>
-    <button id="btnRight" data-dir="right">▶</button>
-  </div>
   <script>
     (function() {
       var canvas = document.getElementById('game');
       var ctx = canvas.getContext('2d');
-      var state = 'playing';
+      var state = 'start';
+      var MOVE_INTERVAL_MS = 250;  // elderly
+      var lastMove = 0;
+
       function resize() {
         var dpr = window.devicePixelRatio || 1;
         canvas.width = window.innerWidth * dpr;
@@ -240,7 +238,30 @@ export const OUTPUT_FORMAT_BLOCK = `ФОРМАТ: только <!DOCTYPE html>..
       }
       resize();
       window.addEventListener('resize', resize);
-      // игровая логика
+
+      // обработка postMessage от родителя
+      window.addEventListener('message', function(event) {
+        var data = event.data;
+        if (!data || data.type !== 'bgen:input') return;
+        switch (data.action) {
+          case 'left': setDir('left'); break;
+          case 'right': setDir('right'); break;
+          case 'up': setDir('up'); break;
+          case 'down': setDir('down'); break;
+          case 'tap': onTap(); break;
+          case 'restart': reset(); break;
+        }
+      });
+
+      function loop(t) {
+        if (state === 'playing' && t - lastMove > MOVE_INTERVAL_MS) {
+          lastMove = t;
+          move();
+        }
+        render();
+        requestAnimationFrame(loop);
+      }
+      requestAnimationFrame(loop);
     })();
   </script>
 </body>
@@ -249,6 +270,7 @@ export const OUTPUT_FORMAT_BLOCK = `ФОРМАТ: только <!DOCTYPE html>..
 export const QUALITY_REMINDER = `ПОМНИ:
 - Игрок понимает правила за 3 секунды.
 - Крупные элементы, читаемый текст.
-- Кнопки ОБЯЗАТЕЛЬНЫ для touch.
+- Скорость игры соответствует аудитории (elderly = медленно).
 - Canvas на весь экран, без хардкода.
+- Управление — через postMessage от родителя, своих кнопок НЕ делай.
 - Проверь код перед ответом.`;

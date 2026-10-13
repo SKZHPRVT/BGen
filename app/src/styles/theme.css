@@ -157,7 +157,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 }
 
 /* ============================================ */
-/* ЭКРАНЫ (общие)                                */
+/* ЭКРАНЫ                                        */
 /* ============================================ */
 
 .screen {
@@ -444,9 +444,96 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
   z-index: 100;
   transition: transform 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .float-settings-btn:active { transform: scale(0.9); background: var(--yellow); }
+
+/* ============================================ */
+/* СОЛОНКА — панель управления поверх игры       */
+/* ============================================ */
+
+.game-controls {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 20px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;
+  padding: 0 12px;
+}
+
+.controls-dpad {
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+/* Скрываем блоки в зависимости от режима */
+.game-controls:not(.has-dpad) .controls-dpad {
+  display: none;
+}
+.game-controls:not(.has-tap) #ctrlTap {
+  display: none;
+}
+
+.ctrl-btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(30, 30, 30, 0.75);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.08s, background 0.12s;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+
+.ctrl-btn:active,
+.ctrl-btn.pressed {
+  transform: scale(0.9);
+  background: rgba(255, 221, 0, 0.85);
+  color: #000;
+}
+
+.ctrl-btn-tap {
+  width: 80px;
+  height: 80px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  background: rgba(255, 221, 0, 0.9);
+  color: #000;
+  border-color: rgba(255, 221, 0, 1);
+}
+
+.ctrl-btn-restart {
+  width: 52px;
+  height: 52px;
+  font-size: 22px;
+  background: rgba(30, 30, 30, 0.6);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+@media (max-width: 380px) {
+  .ctrl-btn { width: 56px; height: 56px; font-size: 22px; }
+  .ctrl-btn-tap { width: 68px; height: 68px; font-size: 14px; }
+  .ctrl-btn-restart { width: 46px; height: 46px; }
+}
 
 /* ============================================ */
 /* МОДАЛЫ                                        */
@@ -598,7 +685,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 .modal-actions .modal-btn { padding: 12px 10px; font-size: 13px; }
 
 /* ============================================ */
-/* СПИСОК ИГР В МОДАЛЕ                           */
+/* СПИСОК ИГР                                    */
 /* ============================================ */
 
 .games-list { display: flex; flex-direction: column; gap: 8px; }
