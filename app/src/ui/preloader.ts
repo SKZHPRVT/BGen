@@ -1,71 +1,80 @@
 /**
- * Прелоадеры BGen.
+ * Два прелоадера BGen.
  *
- * 1. runBootPreloader() — стартовый прелоадер при открытии приложения.
- *    Показывает [BE......] + GEN + хаос собирается в шарик. ~2.5 сек.
- *    После — плавно скрывается и показывает экран start.
+ * 1. runBootPreloader() — при открытии приложения.
+ *    Показывает [BE......] + GEN + пиксельный шарик из хаоса.
+ *    ~2.5 сек, потом fade-out и показывается экран start.
  *
- * 2. showLoadingPreloader() — прелоадер при генерации.
- *    Показывает [BE......] внизу + хаос собирается в шарик.
- *    Вызывается при старте генерации.
- *
- * 3. hideLoadingPreloader() — скрывает экран loading.
+ * 2. showLoadingPreloader() — при генерации игры.
+ *    Показывает пиксельный шарик из хаоса + [BE......] внизу.
+ *    Вызывается перед generate(). hideLoadingPreloader() — после.
  */
 
 const YELLOW = "#ffdd00";
 const BLACK = "#000000";
 
 // =============================================================
-// СТАРТОВЫЙ ПРЕЛОАДЕР (при открытии)
+// ПРЕЛОАДЕР 1 — СТАРТОВЫЙ (при открытии)
 // =============================================================
 
 export async function runBootPreloader(): Promise<void> {
-  const bootScreen = document.getElementById("screen-boot");
-  const startScreen = document.getElementById("screen-start");
-  const lettersEl = document.getElementById("boot-letters");
-  const genEl = document.getElementById("boot-gen");
-  const canvas = document.getElementById("boot-canvas") as HTMLCanvasElement | null;
+  const preloaderEl = document.getElementById("preloader");
+  const lettersEl = document.getElementById("bee-letters");
+  const genEl = document.getElementById("bee-gen");
+  const ballEl = document.getElementById("bee-ball") as HTMLCanvasElement | null;
+  const appEl = document.getElementById("screen-start");
 
-  if (!bootScreen || !startScreen) {
-    // Fallback — просто показываем старт
-    startScreen?.removeAttribute("hidden");
+  if (!preloaderEl || !lettersEl || !genEl || !appEl) {
+    appEl?.removeAttribute("hidden");
+    preloaderEl?.remove();
     return;
   }
 
-  // Запускаем анимацию шарика
-  if (canvas) {
-    startChaosAnimation(canvas, { showGen: false, duration: 2200 });
-  }
+  // Шарик собирается из хаоса
+  if (ballEl) assembleBall(ballEl);
 
   // Анимация [BE......]
-  if (lettersEl) {
-    await animateLetters(lettersEl, 220);
+  lettersEl.innerHTML = renderLetters("BE······");
+  await sleep(400);
+
+  const steps = [
+    "BE·····E",
+    "BEE····E",
+    "BEEE···E",
+    "BEEEE··E",
+    "BEEEEE·E",
+    "BEEEEEE·",
+    "BEEEEEEE",
+  ];
+  for (const s of steps) {
+    lettersEl.innerHTML = renderLetters(s);
+    await sleep(180);
   }
 
-  // GEN — большими буквами
-  if (genEl) {
-    genEl.innerHTML =
-      '<span class="boot-gen-letter">G</span>' +
-      '<span class="boot-gen-letter">E</span>' +
-      '<span class="boot-gen-letter">N</span>';
-    await sleep(200);
-    genEl.classList.add("show");
-  }
-
-  // Даём полюбоваться
-  await sleep(900);
-
-  // Fade-out и переход на start
-  bootScreen.style.transition = "opacity 0.5s ease-out";
-  bootScreen.style.opacity = "0";
+  // Даём шарику дособраться
   await sleep(500);
 
-  bootScreen.setAttribute("hidden", "");
-  startScreen.removeAttribute("hidden");
+  // Показываем GEN
+  genEl.innerHTML =
+    '<span class="bee-gen-letter">G</span>' +
+    '<span class="bee-gen-letter">E</span>' +
+    '<span class="bee-gen-letter">N</span>';
+  genEl.classList.add("show");
+
+  // Пауза на "полюбоваться"
+  await sleep(900);
+
+  // Fade-out
+  preloaderEl.classList.add("fade-out");
+  await sleep(500);
+  preloaderEl.remove();
+
+  // Показываем стартовый экран
+  appEl.removeAttribute("hidden");
 }
 
 // =============================================================
-// ПРЕЛОАДЕР ГЕНЕРАЦИИ
+// ПРЕЛОАДЕР 2 — ГЕНЕРАЦИЯ
 // =============================================================
 
 let loadingLettersInterval: number | null = null;
@@ -81,10 +90,9 @@ export function showLoadingPreloader(): void {
   screenGame?.setAttribute("hidden", "");
   screenLoading.removeAttribute("hidden");
 
-  const lettersEl = document.getElementById("bee-letters");
+  const lettersEl = document.getElementById("loading-letters");
   const canvas = document.getElementById("chaos-canvas") as HTMLCanvasElement | null;
 
-  // Анимация [BE......]
   if (lettersEl && loadingLettersInterval === null) {
     const SEQ = [
       "BE······", "BE·····E", "BEE····E", "BEEE···E",
@@ -98,9 +106,8 @@ export function showLoadingPreloader(): void {
     }, 220);
   }
 
-  // Хаос-шарик
   if (canvas) {
-    startChaosAnimation(canvas, { showGen: false, duration: 2000 });
+    startChaosAnimation(canvas);
   }
 }
 
@@ -141,20 +148,95 @@ function renderLetters(text: string): string {
     .join("");
 }
 
-/** Анимация букв [BE......] для стартового прелоадера */
-async function animateLetters(lettersEl: HTMLElement, tickMs: number): Promise<void> {
-  const SEQ = [
-    "BE······", "BE·····E", "BEE····E", "BEEE···E",
-    "BEEEE··E", "BEEEEE·E", "BEEEEEE·", "BEEEEEEE",
-  ];
-  for (const s of SEQ) {
-    lettersEl.innerHTML = renderLetters(s);
-    await sleep(tickMs);
+// =============================================================
+// ПРЕЛОАДЕР 1 — шарик собирается из хаоса в .bee-ball (canvas 480x480)
+// =============================================================
+
+interface Pixel1 {
+  sx: number; sy: number;
+  tx: number; ty: number;
+  x: number;  y: number;
+  color: string;
+  delay: number;
+  duration: number;
+}
+
+function assembleBall(canvas: HTMLCanvasElement): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const W = canvas.width;
+  const H = canvas.height;
+  const CX = W / 2;
+  const CY = H / 2;
+  const R = Math.min(W, H) * 0.42;
+  const PIXEL = 4;
+
+  const pixels: Pixel1[] = [];
+
+  for (let y = -R; y <= R; y += PIXEL) {
+    for (let x = -R; x <= R; x += PIXEL) {
+      const dist = Math.sqrt(x * x + y * y);
+      if (dist > R) continue;
+
+      const px = x + PIXEL / 2;
+      const py = y + PIXEL / 2;
+
+      const diagonal = (px + py) / Math.SQRT2;
+      const bandAngle = Math.atan2(py, px);
+      const combined = bandAngle + Math.PI;
+      const bandSeg = Math.floor((combined + diagonal * 0.005) / (Math.PI / 3)) % 2;
+      const color = bandSeg === 0 ? YELLOW : BLACK;
+
+      pixels.push({
+        sx: Math.random() * W,
+        sy: Math.random() * H,
+        tx: CX + px,
+        ty: CY + py,
+        x: Math.random() * W,
+        y: Math.random() * H,
+        color,
+        delay: Math.random() * 400,
+        duration: 1200 + Math.random() * 400,
+      });
+    }
   }
+
+  const startTime = performance.now();
+
+  function frame(now: number): void {
+    ctx.clearRect(0, 0, W, H);
+
+    let allDone = true;
+    for (const p of pixels) {
+      const t = Math.max(0, now - startTime - p.delay) / p.duration;
+      const clamped = Math.min(1, t);
+      if (clamped < 1) allDone = false;
+
+      const eased = 1 - Math.pow(1 - clamped, 3);
+      p.x = p.sx + (p.tx - p.sx) * eased;
+      p.y = p.sy + (p.ty - p.sy) * eased;
+
+      ctx.fillStyle = p.color;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y), PIXEL, PIXEL);
+    }
+
+    if (!allDone) {
+      requestAnimationFrame(frame);
+    } else {
+      ctx.clearRect(0, 0, W, H);
+      for (const p of pixels) {
+        ctx.fillStyle = p.color;
+        ctx.fillRect(Math.round(p.tx), Math.round(p.ty), PIXEL, PIXEL);
+      }
+    }
+  }
+
+  requestAnimationFrame(frame);
 }
 
 // =============================================================
-// Canvas-анимация: хаос → шарик BeeLine
+// ПРЕЛОАДЕР 2 — шарик собирается из хаоса на canvas #chaos-canvas
 // =============================================================
 
 interface ChaosPixel {
@@ -167,10 +249,7 @@ interface ChaosPixel {
   duration: number;
 }
 
-function startChaosAnimation(
-  canvas: HTMLCanvasElement,
-  opts: { showGen?: boolean; duration?: number } = {},
-): void {
+function startChaosAnimation(canvas: HTMLCanvasElement): void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
@@ -193,7 +272,7 @@ function startChaosAnimation(
     const W = canvas.clientWidth;
     const H = canvas.clientHeight;
     const CX = W / 2;
-    // Центр шарика чуть выше середины — чтобы GEN и [BE......] влезли снизу
+    // Шарик чуть выше середины, чтобы [BE......] внизу не перекрывал
     const CY = H * 0.42;
     const R = Math.min(W, H) * 0.28;
     const PIXEL = 4;
@@ -222,8 +301,8 @@ function startChaosAnimation(
           x: Math.random() * W,
           y: Math.random() * H,
           color,
-          startAt: Math.random() * (opts.duration ?? 1500) * 0.6,
-          duration: (opts.duration ?? 1500) * 0.7 + Math.random() * 600,
+          startAt: Math.random() * 900,
+          duration: 1400 + Math.random() * 600,
         });
       }
     }
@@ -233,7 +312,6 @@ function startChaosAnimation(
   window.addEventListener("resize", buildPixels);
 
   const startTs = performance.now();
-  let raf = 0;
 
   function frame(now: number): void {
     const W = canvas.clientWidth;
@@ -262,7 +340,6 @@ function startChaosAnimation(
       ctx.fillRect(Math.round(p.x), Math.round(p.y), 4, 4);
     }
 
-    // Пульсация собранного шарика
     if (elapsed > 2400) {
       const pulse = 1 + Math.sin((elapsed - 2400) / 400) * 0.03;
       ctx.globalAlpha = 0.15;
@@ -273,8 +350,8 @@ function startChaosAnimation(
       ctx.globalAlpha = 1;
     }
 
-    raf = requestAnimationFrame(frame);
+    requestAnimationFrame(frame);
   }
 
-  raf = requestAnimationFrame(frame);
+  requestAnimationFrame(frame);
 }

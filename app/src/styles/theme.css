@@ -1,6 +1,5 @@
 /* ============================================ */
-/* BGen — новая тема                             */
-/* Экраны: boot / start / loading / game         */
+/* BGen — тема                                   */
 /* ============================================ */
 
 :root {
@@ -49,52 +48,53 @@ html, body {
 body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 
 /* ============================================ */
-/* ЭКРАНЫ (общие)                                */
+/* ПРЕЛОАДЕР 1: СТАРТОВЫЙ                        */
 /* ============================================ */
 
-.screen {
+.preloader {
   position: fixed;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  z-index: 1;
-}
-
-.screen[hidden] { display: none; }
-
-/* ============================================ */
-/* ЭКРАН 0: СТАРТОВЫЙ ПРЕЛОАДЕР                 */
-/* ============================================ */
-
-.screen-boot {
   background: #ffffff;
-  overflow: hidden;
+  display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.5s ease-out;
 }
 
-#boot-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.boot-content {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  width: 100%;
-  max-width: 420px;
-  padding: 24px;
+.preloader.fade-out {
+  opacity: 0;
   pointer-events: none;
 }
 
-.boot-bee {
+.preloader-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+}
+
+.bee-ball {
+  display: block;
+  width: min(60vw, 280px);
+  height: min(60vw, 280px);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.bee-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+}
+
+.bee-bar {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -108,7 +108,24 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   width: 100%;
 }
 
-.boot-gen {
+.bee-bracket {
+  color: #000000;
+  font-weight: 900;
+}
+
+.bee-letters {
+  display: inline-block;
+  min-width: 8ch;
+  text-align: center;
+  white-space: pre;
+  font-variant-numeric: tabular-nums;
+}
+
+.bee-letters .bee-yellow { color: #ffdd00; }
+.bee-letters .bee-black  { color: #000000; }
+.bee-letters .bee-dot    { color: #cccccc; }
+
+.bee-gen {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -128,34 +145,30 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
     transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.2);
 }
 
-.boot-gen.show {
+.bee-gen.show {
   opacity: 1;
   transform: translateY(0) scale(1);
 }
 
-.boot-gen-letter {
+.bee-gen-letter {
   display: inline-block;
   text-align: center;
   flex: 0 0 auto;
 }
 
-/* Общие элементы для [BE......] */
-.bee-bracket {
-  color: #000000;
-  font-weight: 900;
+/* ============================================ */
+/* ЭКРАНЫ (общие)                                */
+/* ============================================ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
 }
 
-.bee-letters {
-  display: inline-block;
-  min-width: 8ch;
-  text-align: center;
-  white-space: pre;
-  font-variant-numeric: tabular-nums;
-}
-
-.bee-letters .bee-yellow { color: #ffdd00; }
-.bee-letters .bee-black  { color: #000000; }
-.bee-letters .bee-dot    { color: #cccccc; }
+.screen[hidden] { display: none; }
 
 /* ============================================ */
 /* ЭКРАН 1: СТАРТ                                */
@@ -277,7 +290,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   font-family: inherit;
   border-radius: var(--radius);
   cursor: pointer;
-  transition: transform 0.06s, background 0.15s, box-shadow 0.15s;
+  transition: transform 0.06s, background 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -293,19 +306,9 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   margin-top: 8px;
 }
 
-.btn-primary:active {
-  transform: scale(0.98);
-  background: #222;
-}
-
-.btn-primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.btn-primary-icon {
-  font-size: 14px;
-}
+.btn-primary:active { transform: scale(0.98); background: #222; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary-icon { font-size: 14px; }
 
 .btn-secondary {
   background: #fff;
@@ -351,7 +354,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 }
 
 /* ============================================ */
-/* ЭКРАН 2: ПРЕЛОАДЕР ГЕНЕРАЦИИ                 */
+/* ПРЕЛОАДЕР 2: ГЕНЕРАЦИЯ                        */
 /* ============================================ */
 
 .screen-loading {
@@ -441,13 +444,9 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
   z-index: 100;
   transition: transform 0.15s, background 0.15s;
-  -webkit-tap-highlight-color: transparent;
 }
 
-.float-settings-btn:active {
-  transform: scale(0.9);
-  background: var(--yellow);
-}
+.float-settings-btn:active { transform: scale(0.9); background: var(--yellow); }
 
 /* ============================================ */
 /* МОДАЛЫ                                        */
@@ -473,10 +472,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   animation: fadeIn 0.2s ease-out;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .modal-panel {
   position: relative;
@@ -507,11 +503,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   border-bottom: 2px solid var(--border);
 }
 
-.modal-title {
-  font-size: 20px;
-  font-weight: 800;
-  color: #000;
-}
+.modal-title { font-size: 20px; font-weight: 800; color: #000; }
 
 .modal-close {
   width: 36px;
@@ -528,9 +520,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   transition: background 0.15s;
 }
 
-.modal-close:active {
-  background: var(--yellow);
-}
+.modal-close:active { background: var(--yellow); }
 
 .modal-body {
   flex: 1;
@@ -550,11 +540,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   border-radius: var(--radius);
 }
 
-.modal-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+.modal-section { display: flex; flex-direction: column; gap: 8px; }
 
 .modal-label {
   font-size: 13px;
@@ -582,9 +568,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   -webkit-user-select: text;
 }
 
-.modal-input:focus {
-  border-color: var(--yellow);
-}
+.modal-input:focus { border-color: var(--yellow); }
 
 .modal-btn {
   width: 100%;
@@ -605,46 +589,19 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   user-select: none;
 }
 
-.modal-btn:active {
-  transform: scale(0.98);
-  background: var(--card-bg);
-}
+.modal-btn:active { transform: scale(0.98); background: var(--card-bg); }
+.modal-btn-primary { background: var(--black); color: #fff; border-color: var(--black); }
+.modal-btn-primary:active { background: #333; }
+.modal-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.modal-btn-primary {
-  background: var(--black);
-  color: #fff;
-  border-color: var(--black);
-}
-
-.modal-btn-primary:active {
-  background: #333;
-}
-
-.modal-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.modal-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.modal-actions .modal-btn {
-  padding: 12px 10px;
-  font-size: 13px;
-}
+.modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.modal-actions .modal-btn { padding: 12px 10px; font-size: 13px; }
 
 /* ============================================ */
 /* СПИСОК ИГР В МОДАЛЕ                           */
 /* ============================================ */
 
-.games-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+.games-list { display: flex; flex-direction: column; gap: 8px; }
 
 .game-card {
   display: flex;
@@ -660,10 +617,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   font-family: inherit;
 }
 
-.game-card:active {
-  border-color: var(--yellow);
-  background: var(--card-bg);
-}
+.game-card:active { border-color: var(--yellow); background: var(--card-bg); }
 
 .game-card-preview {
   width: 48px;
@@ -677,10 +631,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   flex-shrink: 0;
 }
 
-.game-card-info {
-  flex: 1;
-  min-width: 0;
-}
+.game-card-info { flex: 1; min-width: 0; }
 
 .game-card-title {
   font-size: 14px;
@@ -691,11 +642,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   white-space: nowrap;
 }
 
-.game-card-meta {
-  font-size: 11px;
-  color: var(--hint);
-  margin-top: 2px;
-}
+.game-card-meta { font-size: 11px; color: var(--hint); margin-top: 2px; }
 
 .game-card-empty {
   text-align: center;

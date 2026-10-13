@@ -19,20 +19,24 @@
 <body>
 
   <!-- =========================================== -->
-  <!-- ЭКРАН 0: СТАРТОВЫЙ ПРЕЛОАДЕР                 -->
+  <!-- ПРЕЛОАДЕР 1: СТАРТОВЫЙ (при открытии)         -->
+  <!-- Шарик + [BE......] + GEN                      -->
   <!-- =========================================== -->
-  <section id="screen-boot" class="screen screen-boot">
-    <canvas id="boot-canvas" class="chaos-canvas"></canvas>
+  <div id="preloader" class="preloader">
+    <div class="preloader-content">
+      <canvas id="bee-ball" class="bee-ball" width="480" height="480"></canvas>
 
-    <div class="boot-content">
-      <div class="boot-bee">
-        <span class="bee-bracket">[</span>
-        <span id="boot-letters" class="bee-letters"></span>
-        <span class="bee-bracket">]</span>
+      <div class="bee-block">
+        <div class="bee-bar">
+          <span class="bee-bracket">[</span>
+          <span id="bee-letters" class="bee-letters"></span>
+          <span class="bee-bracket">]</span>
+        </div>
+
+        <div id="bee-gen" class="bee-gen"></div>
       </div>
-      <div id="boot-gen" class="boot-gen"></div>
     </div>
-  </section>
+  </div>
 
   <!-- =========================================== -->
   <!-- ЭКРАН 1: СТАРТ                                -->
@@ -87,7 +91,8 @@
   </section>
 
   <!-- =========================================== -->
-  <!-- ЭКРАН 2: ПРЕЛОАДЕР ГЕНЕРАЦИИ                 -->
+  <!-- ПРЕЛОАДЕР 2: ГЕНЕРАЦИЯ (при создании игры)    -->
+  <!-- Шарик + [BE......] внизу + текст              -->
   <!-- =========================================== -->
   <section id="screen-loading" class="screen screen-loading" hidden>
     <canvas id="chaos-canvas" class="chaos-canvas"></canvas>
@@ -96,7 +101,7 @@
       <div class="loading-hint">Генерирую игру…</div>
       <div class="loading-bee">
         <span class="bee-bracket">[</span>
-        <span id="bee-letters" class="bee-letters"></span>
+        <span id="loading-letters" class="bee-letters"></span>
         <span class="bee-bracket">]</span>
       </div>
     </div>

@@ -92,7 +92,6 @@ startBtn.addEventListener("click", async () => {
   haptic("medium");
   hideStartStatus();
 
-  // Прелоадер генерации
   showLoadingPreloader();
 
   try {
@@ -116,7 +115,6 @@ startBtn.addEventListener("click", async () => {
     lastGame = game;
     renderGame(game);
 
-    // Даём прелоадеру красивую паузу
     await sleep(600);
     hideLoadingPreloader();
     showScreen("game");
@@ -365,7 +363,7 @@ buildSettings();
   await store.load();
   updateGamesCount();
 
-  // Стартовый прелоадер при открытии
+  // Стартовый прелоадер
   await runBootPreloader();
 
   console.log(`[BGen] Ready in ${platform.kind} mode`);
