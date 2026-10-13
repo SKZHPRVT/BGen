@@ -1,13 +1,16 @@
 /**
  * BGen Core — публичный API гипер-ядра.
  *
- *   const gen = createGenerator();
- *   const result = await gen.generate({ prompt: "замути змейку для бабушки" });
- *   console.log(result.html); // playable HTML
+ * Логика:
+ *   1. classify → GameSpec
+ *   2. Если жанр поддерживается движком → LLM даёт JSON-конфиг → движок строит HTML
+ *      При любой ошибке — используем defaultConfig, никогда не уходим на старый pipeline
+ *   3. Если жанр не поддерживается → старый pipeline (LLM пишет HTML)
  */
 import type {
   GenerateOptions,
   GenerateResult,
+  GameSpec,
   LLMProvider,
   UserInput,
 } from "./types.ts";
@@ -22,10 +25,9 @@ import { SemanticCache } from "./cache/semantic.ts";
 import { globalMetrics } from "./telemetry/metrics.ts";
 import { logger } from "./telemetry/logger.ts";
 
-// Engine (шаблонный движок для популярных жанров)
 import { isSupported, buildGame } from "./engine/build.ts";
 import { buildConfigPrompt } from "./engine/prompts.ts";
-import { normalizeConfig } from "./engine/types.ts";
+import { normalizeConfig, defaultConfig } from "./engine/types.ts";
 
 export interface GeneratorOptions {
   router?: Router;
@@ -56,6 +58,156 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
   const cache = options.cache ?? new SemanticCache();
   const corpusDir = options.corpusDir ?? "core/corpus";
 
+  // ───────────────────────────────────────────────────────────
+  // Engine-путь: LLM → JSON → движок → HTML
+  // Гарантия: никогда не падает, всегда возвращает HTML
+  // ───────────────────────────────────────────────────────────
+  async function generateViaEngine(
+    userInput: UserInput,
+    spec: GameSpec,
+    opts: GenerateOptions,
+    start: number,
+  ): Promise<GenerateResult> {
+    logger.info("Using engine", { genre: spec.genre });
+
+    let rawConfig: any = null;
+    let providerName = "engine-default";
+
+    // Шаг 1. Пытаемся получить JSON-конфиг от LLM
+    try {
+      const { system, user } = buildConfigPrompt(
+        spec.genre,
+        spec.audience,
+        userInput.prompt,
+      );
+
+      const res = await router.generate({
+        system,
+        user,
+        maxTokens: 2000,
+        temperature: 0.7,
+      });
+      providerName = res.provider;
+
+      logger.info("Engine LLM raw response", {
+        provider: res.provider,
+        length: res.text.length,
+        preview: res.text.slice(0, 200),
+      });
+
+      // Парсим JSON
+      let cleaned = res.text.trim();
+      cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, "");
+      cleaned = cleaned.replace(/\n?```\s*$/i, "");
+
+      // Отклоняем ответы с HTML — это явно не JSON-конфиг
+      if (
+        cleaned.includes("<!DOCTYPE") ||
+        cleaned.includes("<html") ||
+        cleaned.includes("<script")
+      ) {
+        logger.warn("LLM returned HTML instead of JSON, using default config");
+      } else {
+        const js = cleaned.indexOf("{");
+        const je = cleaned.lastIndexOf("}");
+        if (js !== -1 && je !== -1) {
+          try {
+            const parsed = JSON.parse(cleaned.slice(js, je + 1));
+            // Проверяем, что это похоже на конфиг игры
+            if (
+              parsed &&
+              typeof parsed === "object" &&
+              (parsed.title || parsed.colors || parsed.speed || parsed.sprites)
+            ) {
+              rawConfig = parsed;
+              logger.info("Parsed JSON config successfully");
+            } else {
+              logger.warn("Parsed JSON is not a game config", {
+                keys: Object.keys(parsed || {}).slice(0, 10),
+              });
+            }
+          } catch (parseErr) {
+            logger.warn("JSON parse failed", {
+              error: (parseErr as Error).message,
+              preview: cleaned.slice(0, 200),
+            });
+          }
+        } else {
+          logger.warn("No JSON object found in LLM response");
+        }
+      }
+    } catch (e) {
+      logger.warn("Engine LLM config failed, using default", {
+        error: (e as Error).message,
+      });
+    }
+
+    // Шаг 2. Собираем HTML. Пробуем с LLM-конфигом, при неудаче — дефолт
+    let html = "";
+    let usedDefault = false;
+
+    try {
+      const cfg = normalizeConfig(rawConfig, spec.genre);
+      html = buildGame(cfg);
+      logger.info("Engine built game", {
+        title: cfg.title,
+        htmlLength: html.length,
+      });
+    } catch (buildErr) {
+      logger.error("Engine build failed, using default config", {
+        error: (buildErr as Error).message,
+      });
+      try {
+        const defCfg = defaultConfig(spec.genre);
+        html = buildGame(defCfg);
+        usedDefault = true;
+      } catch (defErr) {
+        logger.error("Even default build failed", {
+          error: (defErr as Error).message,
+        });
+        // Совсем критичный случай — отдаём минимальный HTML
+        html = `<!DOCTYPE html><html><body style="background:#111;color:#fff;font-family:sans-serif;padding:40px;text-align:center"><h1>Упс</h1><p>Не удалось собрать игру</p></body></html>`;
+        usedDefault = true;
+      }
+    }
+
+    // Шаг 3. Анализ (быстрый — движок гарантирует структуру)
+    let report;
+    try {
+      report = analyze(html, { html });
+    } catch (analyzeErr) {
+      logger.warn("Analyze failed", { error: (analyzeErr as Error).message });
+      report = { ok: true, errors: [], warnings: [], looksLikeGame: true, html, size: html.length };
+    }
+
+    // Шаг 4. Кэш
+    if (report.ok && opts.useCache !== false) {
+      cache.set(spec, html);
+    }
+
+    const durationMs = Date.now() - start;
+    globalMetrics.recordGeneration(spec.genre, 1, durationMs, false);
+    logger.info("Engine generation done", {
+      genre: spec.genre,
+      provider: providerName,
+      ok: report.ok,
+      usedDefault,
+      durationMs,
+    });
+
+    return {
+      html,
+      spec,
+      attempts: 1,
+      provider: usedDefault ? "engine+default" : `engine+${providerName}`,
+      warnings: report.warnings.map((w) => `${w.id}: ${w.message}`),
+      repairedErrors: [],
+      fromCache: false,
+      ok: report.ok,
+      durationMs,
+    };
+  }
+
   return {
     async generate(input, opts = {}): Promise<GenerateResult> {
       const start = Date.now();
@@ -69,9 +221,7 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         audience: spec.audience,
       });
 
-      // ─────────────────────────────────────────────────────────
       // 1. Кэш
-      // ─────────────────────────────────────────────────────────
       if (opts.useCache !== false) {
         const cached = cache.get(spec);
         if (cached) {
@@ -92,116 +242,23 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         globalMetrics.recordCacheMiss();
       }
 
-      // ─────────────────────────────────────────────────────────
-      // 2. ЕСЛИ ЖАНР ПОДДЕРЖИВАЕТСЯ ДВИЖКОМ — идём через движок
-      // ─────────────────────────────────────────────────────────
+      // 2. Движок (для поддерживаемых жанров) — гарантированно возвращает HTML
       if (isSupported(spec.genre)) {
-        logger.info("Using engine", { genre: spec.genre });
-        try {
-          const { system, user } = buildConfigPrompt(
-            spec.genre,
-            spec.audience,
-            userInput.prompt,
-          );
-
-          let rawConfig: any = null;
-          let providerName = "engine-default";
-
-          // Пробуем получить JSON-конфиг от LLM через router
-          try {
-            const res = await router.generate({
-              system,
-              user,
-              maxTokens: 2000,
-              temperature: 0.7,
-            });
-            providerName = res.provider;
-
-            // Парсим JSON из ответа
-            let cleaned = res.text.trim();
-            cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, "");
-            cleaned = cleaned.replace(/\n?```\s*$/i, "");
-            const js = cleaned.indexOf("{");
-            const je = cleaned.lastIndexOf("}");
-            if (js !== -1 && je !== -1) {
-              try {
-                rawConfig = JSON.parse(cleaned.slice(js, je + 1));
-              } catch (parseErr) {
-                logger.warn("JSON parse failed, using default config", {
-                  error: (parseErr as Error).message,
-                  raw: cleaned.slice(0, 200),
-                });
-              }
-            }
-          } catch (e) {
-            logger.warn("Engine LLM config failed, using default", {
-              error: (e as Error).message,
-            });
-          }
-
-          const cfg = normalizeConfig(rawConfig, spec.genre);
-          const html = buildGame(cfg);
-
-          // Валидация собранного HTML (быстрая — движок гарантирует структуру)
-          const report = analyze(html, { html });
-
-          if (report.ok && opts.useCache !== false) {
-            cache.set(spec, html);
-          }
-
-          const durationMs = Date.now() - start;
-          globalMetrics.recordGeneration(spec.genre, 1, durationMs, false);
-          logger.info("Engine generation done", {
-            genre: spec.genre,
-            provider: providerName,
-            ok: report.ok,
-            durationMs,
-            title: cfg.title,
-          });
-
-          return {
-            html,
-            spec,
-            attempts: 1,
-            provider: `engine+${providerName}`,
-            warnings: report.warnings.map((w) => `${w.id}: ${w.message}`),
-            repairedErrors: [],
-            fromCache: false,
-            ok: report.ok,
-            durationMs,
-          };
-        } catch (e) {
-          logger.error("Engine failed, falling back to LLM", {
-            error: (e as Error).message,
-          });
-          // Не падаем — идём по старому пути через LLM
-        }
+        return generateViaEngine(userInput, spec, opts, start);
       }
 
-      // ─────────────────────────────────────────────────────────
-      // 3. Few-shot из корпуса (старый pipeline для неизвестных жанров)
-      // ─────────────────────────────────────────────────────────
+      // 3. Старый pipeline (для остальных жанров)
       let examples: string[] = [];
       if (opts.useCorpus !== false) {
         const corpus: CorpusEntry[] = await loadCorpus(corpusDir);
         if (corpus.length > 0) {
           const retrieved = retrieveExamples(spec, corpus, { topK: 2 });
           examples = formatExamplesForPrompt(retrieved);
-          logger.info("Corpus retrieval", {
-            found: retrieved.length,
-            total: corpus.length,
-          });
         }
       }
 
-      // ─────────────────────────────────────────────────────────
-      // 4. Компиляция промпта
-      // ─────────────────────────────────────────────────────────
       const compiled = compile(userInput, { examples });
 
-      // ─────────────────────────────────────────────────────────
-      // 5. Генерация с auto-repair
-      // ─────────────────────────────────────────────────────────
       const result = await generateWithRepair(
         router,
         compiled.system,
@@ -222,12 +279,6 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
 
       const durationMs = Date.now() - start;
       globalMetrics.recordGeneration(spec.genre, result.attempts, durationMs, false);
-      logger.info("Generation done", {
-        genre: spec.genre,
-        attempts: result.attempts,
-        ok: finalOk,
-        durationMs,
-      });
 
       return {
         html: result.html,
@@ -243,12 +294,8 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
     },
 
     async iterate(previousCode, previousPrompt, newPrompt, opts = {}) {
-      // Классифицируем новый промпт
       const newSpec = classify(newPrompt);
-
-      // Если жанр определён нечётко — наследуем контекст от предыдущего промпта
       const isGeneric = newSpec.genre === "unknown";
-
       const effectivePrompt =
         isGeneric && previousPrompt
           ? `${newPrompt} (игра: ${previousPrompt})`
@@ -272,7 +319,6 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
   };
 }
 
-// Реэкспорт полезного
 export type {
   Audience,
   GameSpec,

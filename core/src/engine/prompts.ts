@@ -1,6 +1,6 @@
 /**
  * Промпт для LLM: «верни JSON-конфиг для игры».
- * Полная schema со всеми визуальными фишками.
+ * Жёсткое требование — только JSON, никакого HTML.
  */
 import type { Genre, Audience } from "../types.ts";
 
@@ -9,135 +9,92 @@ export function buildConfigPrompt(
   audience: Audience,
   userPrompt: string,
 ): { system: string; user: string } {
-  const system = `Ты — геймдизайнер и арт-директор. Пользователь хочет игру. Ты возвращаешь ТОЛЬКО JSON-конфиг с параметрами. НЕ пиши код.
+  const system = `Ты — API, который возвращает JSON. ТВОЯ РАБОТА — ВЕРНУТЬ ТОЛЬКО JSON-ОБЪЕКТ. 
+
+КРИТИЧНО, ЧИТАЙ ВНИМАТЕЛЬНО:
+- НЕ пиши HTML. НЕ пиши <!DOCTYPE html>. НЕ пиши <html>. НЕ пиши <script>. НЕ пиши <style>.
+- НЕ пиши CSS. НЕ пиши JavaScript. НЕ пиши код игры.
+- НЕ пиши текст до JSON. НЕ пиши текст после JSON.
+- НЕ оборачивай в \`\`\`json.
+- Только JSON-объект, начинающийся с { и заканчивающийся }.
+
+ТЫ НЕ ГЕНЕРИРУЕШЬ ИГРУ. ТЫ ГЕНЕРИРУЕШЬ КОНФИГ ДЛЯ ИГРЫ, которую уже написали другие.
+Игра уже существует, работает, ты только настраиваешь цвета/название/спрайты.
 
 ЖАНР: ${genre}
 АУДИТОРИЯ: ${audience}
 
-ПОЛНАЯ СХЕМА JSON:
+СХЕМА JSON:
 {
-  "title": "string (1-30, название игры на русском)",
-  "subtitle": "string (0-60, опционально)",
+  "title": "string (1-30, на русском)",
+  "subtitle": "string (опционально)",
   "stylePreset": "cozy|neon|retro8bit|minimal|space|forest|candy|cyberpunk|papercraft|nature",
 
   "colors": {
-    "background": "#hex (фон всего экрана)",
-    "surface": "#hex (фон игрового поля)",
-    "primary": "#hex (цвет игрока)",
-    "secondary": "#hex (вторичный, опционально)",
-    "accent": "#hex (цвет еды/цели)",
-    "text": "#hex (цвет текста)",
-    "grid": "#hex (сетка, опционально)",
-    "glow": "#hex (свечение, опционально)"
+    "background": "#hex",
+    "surface": "#hex",
+    "primary": "#hex",
+    "secondary": "#hex (опционально)",
+    "accent": "#hex",
+    "text": "#hex",
+    "grid": "#hex (опционально)",
+    "glow": "#hex (опционально)"
   },
 
   "background": {
     "type": "solid|gradient|particles|stars|grid",
-    "gradient": { "from": "#hex", "to": "#hex", "angle": 0-360 },
-    "particles": { "count": 5-100, "color": "#hex", "size": 1-5, "speed": 0.1-1, "shape": "circle|square|star" }
+    "gradient": { "from": "#hex", "to": "#hex", "angle": 180 },
+    "particles": { "count": 30, "color": "#hex", "size": 2, "speed": 0.2, "shape": "circle" }
   },
 
   "sprites": {
-    "player": {
-      "type": "emoji|shape|pixel|svg",
-      "emoji": "🐱",
-      "shape": "circle|square|roundedSquare|triangle|hexagon|star|diamond",
-      "size": 0.5-1.0,
-      "color": "#hex",
-      "outline": { "width": 0-4, "color": "#hex" },
-      "pixel": {
-        "size": 12-20,
-        "palette": { "o": "#hex", "w": "#hex", ".": "transparent" },
-        "grid": ["....oo....", "...oooo...", "..."]
-      }
-    },
-    "food": { "type": "emoji|shape|pixel", "emoji": "🍎", "shape": "circle", "size": 0.7, "color": "#hex" },
-    "obstacle": { /* аналогично */ },
-    "powerup": { /* аналогично */ }
+    "player": { "type": "emoji|shape", "emoji": "🐍", "shape": "roundedSquare", "size": 0.85, "color": "#hex" },
+    "food": { "type": "emoji|shape", "emoji": "🍎", "shape": "circle", "size": 0.7, "color": "#hex" }
   },
 
   "animations": {
-    "player": "none|pulse|breathe|shake|rotate|bounce|glow",
-    "food": "none|pulse|bounce|rotate|glow",
-    "obstacle": "none|shake|breathe"
+    "player": "none|pulse|breathe|shake|glow",
+    "food": "none|pulse|bounce|glow"
   },
 
   "texts": {
-    "startTitle": "string",
     "startHint": "string",
     "gameOverTitle": "string",
     "gameOverHint": "string (можно {score})",
-    "winTitle": "string",
-    "restartButton": "string (до 15 символов)",
-    "scorePrefix": "string",
-    "tutorial": "string (0-120, опционально)"
+    "restartButton": "string (до 15)",
+    "scorePrefix": "string"
   },
 
   "audio": {
     "enabled": true/false,
-    "volume": 0.0-1.0,
     "sounds": {
-      "eat": "pop|coin|beep|chime",
-      "gameOver": "fail|down|softFail",
-      "win": "fanfare|chime",
-      "tap": "click|beep"
+      "eat": "pop|coin|chime",
+      "gameOver": "softFail|down|fail"
     }
   },
 
-  "speed": number (60-400 ms между шагами),
-  "fontSize": number (16-24),
-  "buttonSize": number (56-96),
-  "gridSize": number (10-24),
-  "difficulty": "easy|normal|hard",
-  "lives": number (1-5),
-  "scorePerFood": number (1-50),
-  "wrapAroundWalls": true/false
+  "speed": 60-400,
+  "fontSize": 16-24,
+  "buttonSize": 56-96,
+  "gridSize": 10-24
 }
 
 ПРАВИЛА ПО АУДИТОРИИ:
 ${audienceRule(audience)}
 
-ВИЗУАЛЬНЫЕ ПРАВИЛА:
+ВЫБОР ВИЗУАЛА:
+- Emoji для узнаваемых объектов (🍎 🐱 ⭐).
+- Shape для простых (круг, квадрат, скруглённый квадрат).
+- stylePreset — общее настроение (cozy, neon, space, candy).
 
-1. ВЫБОР СПРАЙТА:
-   - Если объект — узнаваемое emoji (яблоко, котик, звезда, гриб) → type: "emoji"
-   - Если объект простой геометрический (шар, блок) → type: "shape"
-   - Если объект должен выглядеть авторским и стилизованным (пиксельный слон, космокот, робот) → type: "pixel"
-     • grid: массив строк одинаковой длины (8-20 символов каждая)
-     • каждая буква = цвет из palette, точка = прозрачный
-     • рисуй простые узнаваемые формы
-
-2. ВЫБОР СТИЛЯ (stylePreset):
-   - "бабушка/уют" → cozy, forest, papercraft
-   - "ребёнок/яркое" → candy
-   - "космос/звёзды" → space
-   - "неон/киберпанк" → neon, cyberpunk
-   - "минимализм" → minimal
-   - "ретро/8бит" → retro8bit
-
-3. АНИМАЦИИ:
-   - Еда: pulse или bounce
-   - Игрок: breathe (спокойно) или none
-   - Препятствия: shake (если пугающие)
-
-4. ЦВЕТА:
-   - Все цвета — hex (#RRGGBB).
-   - Высокий контраст текста/фона.
-   - Для elderly: приглушённые, тёплые, пастельные.
-   - Для kids: яркие, насыщенные.
-   - Для hardcore: тёмная тема, неон.
-
-ЖЁСТКИЕ ПРАВИЛА:
-1. Верни ТОЛЬКО JSON. Ничего до, ничего после.
-2. Без markdown-обёрток \`\`\`json.
-3. Все поля обязательны, кроме помеченных "опционально".
-4. Название — на русском, короткое, отражает промпт.
+Пример ответа (только JSON, без \`\`\`):
+{"title":"Змейка для бабушки","stylePreset":"cozy","colors":{"background":"#fdf6e3","surface":"#f5e6c8","primary":"#2a7f62","accent":"#c0392b","text":"#2c1810","grid":"#e8d4a8"},"sprites":{"player":{"type":"shape","shape":"roundedSquare","size":0.85,"color":"#2a7f62"},"food":{"type":"emoji","emoji":"🍎"}},"speed":280,"fontSize":22,"buttonSize":80,"gridSize":14,"texts":{"startHint":"Свайпайте","gameOverTitle":"Игра окончена","restartButton":"Заново","scorePrefix":"Счёт"}}
 
 ОТВЕЧАЙ ТОЛЬКО JSON.`;
 
   const user = `Запрос: "${userPrompt}"
 
-Верни JSON-конфиг для игры.`;
+Верни ТОЛЬКО JSON-объект. Без HTML. Без кода. Без \`\`\`.`;
 
   return { system, user };
 }
@@ -145,39 +102,33 @@ ${audienceRule(audience)}
 function audienceRule(audience: Audience): string {
   switch (audience) {
     case "elderly":
-      return `- speed: 240-320 ms
+      return `- speed: 240-320
 - fontSize: 22-24
 - buttonSize: 76-96
-- gridSize: 12-16 (крупные клетки)
-- Цвета: тёплые, спокойные, пастельные.
-- Избегай чистого белого и ярких кислотных цветов.
-- sprite.player — простой shape (круг/квадрат), не pixel.
-- Анимации: breathe, pulse (спокойные).
-- audio.enabled: false (пожилым не нужны бипы)`;
+- gridSize: 12-16
+- stylePreset: cozy, papercraft или nature
+- Тёплые, спокойные цвета
+- emoji для еды (🍎 🍒 🍇)`;
     case "kids":
-      return `- speed: 140-200 ms
+      return `- speed: 140-200
 - fontSize: 20-24
 - buttonSize: 76-96
 - gridSize: 14-18
-- Цвета: яркие, весёлые.
-- sprite.player/food — emoji (🐱 🍎 🌟) или pixel.
-- Анимации: bounce, pulse.
-- audio.enabled: true, звуки pop/coin`;
+- stylePreset: candy, cozy
+- Яркие насыщенные цвета
+- emoji для еды (🍕 🍩 🌈) и игрока (🐱 🐶 🐸)`;
     case "hardcore":
-      return `- speed: 70-110 ms
+      return `- speed: 70-110
 - fontSize: 16-18
 - buttonSize: 60-72
 - gridSize: 20-24
-- Цвета: тёмная тема, неон.
-- stylePreset: neon или cyberpunk.
-- Анимации: glow, pulse.
-- audio.enabled: true`;
+- stylePreset: neon, cyberpunk
+- Тёмная тема, неон`;
     default:
-      return `- speed: 130-180 ms
+      return `- speed: 130-180
 - fontSize: 18-22
 - buttonSize: 64-80
 - gridSize: 16-20
-- Сбалансированные цвета.
-- Можно emoji или простой shape.`;
+- stylePreset: на выбор (space, forest, cozy)`;
   }
 }
