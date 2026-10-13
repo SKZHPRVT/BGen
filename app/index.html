@@ -18,7 +18,9 @@
 </head>
 <body>
 
-  <!-- ПРЕЛОАДЕР 1: СТАРТОВЫЙ -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ПРЕЛОАДЕР 1: СТАРТОВЫЙ (при открытии приложения)        -->
+  <!-- ═══════════════════════════════════════════════════════ -->
   <div id="preloader" class="preloader">
     <div class="preloader-content">
       <canvas id="bee-ball" class="bee-ball" width="480" height="480"></canvas>
@@ -33,7 +35,9 @@
     </div>
   </div>
 
-  <!-- ЭКРАН 1: СТАРТ -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ЭКРАН 1: СТАРТ                                          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
   <section id="screen-start" class="screen screen-start" hidden>
     <div class="screen-inner">
       <h1 class="hero-title">Создай игру</h1>
@@ -61,7 +65,9 @@
     </div>
   </section>
 
-  <!-- ПРЕЛОАДЕР 2: ГЕНЕРАЦИЯ -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ПРЕЛОАДЕР 2: ГЕНЕРАЦИЯ (при создании игры)             -->
+  <!-- ═══════════════════════════════════════════════════════ -->
   <section id="screen-loading" class="screen screen-loading" hidden>
     <canvas id="chaos-canvas" class="chaos-canvas"></canvas>
     <div class="loading-bottom">
@@ -74,26 +80,23 @@
     </div>
   </section>
 
-  <!-- ЭКРАН 3: ИГРА -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ЭКРАН 3: ИГРА (iframe на весь экран)                    -->
+  <!-- ═══════════════════════════════════════════════════════ -->
   <section id="screen-game" class="screen screen-game" hidden>
-    <iframe id="gameFrame" class="game-frame-fullscreen" sandbox="allow-scripts" title="Сгенерированная игра"></iframe>
-
-    <!-- СОЛОНКА: панель управления поверх игры -->
-    <div id="gameControls" class="game-controls" style="display:none">
-      <div class="controls-dpad">
-        <button id="ctrlLeft" class="ctrl-btn" aria-label="Влево">◀</button>
-        <button id="ctrlUp" class="ctrl-btn" aria-label="Вверх">▲</button>
-        <button id="ctrlDown" class="ctrl-btn" aria-label="Вниз">▼</button>
-        <button id="ctrlRight" class="ctrl-btn" aria-label="Вправо">▶</button>
-      </div>
-      <button id="ctrlTap" class="ctrl-btn ctrl-btn-tap" aria-label="Тап">TAP</button>
-      <button id="ctrlRestart" class="ctrl-btn ctrl-btn-restart" aria-label="Заново">⟳</button>
-    </div>
+    <iframe
+      id="gameFrame"
+      class="game-frame-fullscreen"
+      sandbox="allow-scripts"
+      title="Сгенерированная игра"
+    ></iframe>
 
     <button id="settingsBtn" class="float-settings-btn" title="Настройки">⚙</button>
   </section>
 
-  <!-- МОДАЛ НАСТРОЕК -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- МОДАЛ НАСТРОЕК                                          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
   <div id="settingsModal" class="modal" hidden>
     <div class="modal-backdrop"></div>
     <div class="modal-panel">
@@ -121,7 +124,9 @@
     </div>
   </div>
 
-  <!-- МОДАЛ ИГР -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- МОДАЛ ИГР                                               -->
+  <!-- ═══════════════════════════════════════════════════════ -->
   <div id="gamesModal" class="modal" hidden>
     <div class="modal-backdrop"></div>
     <div class="modal-panel">
