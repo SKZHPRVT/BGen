@@ -1,5 +1,6 @@
 /**
  * Шаблон «Гонки».
+ * Игрок рисуется с обводкой, чтобы отличаться от препятствий.
  */
 import type { GameConfig } from "../types.ts";
 import { backgroundRuntime, backgroundCSS, spritesRuntime, audioRuntime } from "../render/index.ts";
@@ -97,14 +98,50 @@ ${audRuntime}
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
 
+  var W = 0, H = 0;
+  var road = { x: 0, w: 0 };
+  var player = { x: 0, y: 0, w: 0, h: 0 };
+  var obstacles = [];
+  var keys = { left: false, right: false };
+  var score = 0;
+  var state = 'playing';
+  var speed = 7;
+  var spawnTimer = 0;
+  var lines = [];
+  var lastTick = 0;
+  var startTs = performance.now();
+
+  var scoreEl = document.getElementById('score');
+  var overlay = document.getElementById('overlay');
+  var overlayTitle = document.getElementById('overlayTitle');
+  var overlayHint = document.getElementById('overlayHint');
+  var overlayBtn = document.getElementById('overlayBtn');
+
+  // Эмодзи по умолчанию для игрока (чтобы отличать от препятствий)
+  var PLAYER_EMOJI_DEFAULT = '🏎️';
+  var OBSTACLE_EMOJI_DEFAULT = '🪨';
+
   function resize() {
     var dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    __initBackground(__cfg.background, window.innerWidth, window.innerHeight);
+    __initBackground(__cfg.background, W, H);
+
+    road.w = Math.min(W * 0.6, 400);
+    road.x = (W - road.w) / 2;
+    player.w = road.w * 0.18;
+    player.h = player.w * 1.6;
+    player.x = W / 2 - player.w / 2;
+    player.y = H - player.h - 100;
+    lines = [];
+    for (var i = 0; i < 10; i++) {
+      lines.push({ y: i * (H / 8) });
+    }
   }
 
   __initAudio(__cfg.audio && __cfg.audio.enabled, __cfg.audio && __cfg.audio.volume);
@@ -114,44 +151,12 @@ ${audRuntime}
     __playSound(type);
   }
 
-  var W = 0, H = 0;
-  var road = { x: 0, w: 0 };
-  var player = { x: 0, y: 0, w: 0, h: 0 };
-  var obstacles = [];
-  var keys = { left: false, right: false };
-  var score = 0;
-  var state = 'playing';
-  var speed = 6;
-  var spawnTimer = 0;
-  var lines = [];
-
-  var scoreEl = document.getElementById('score');
-  var overlay = document.getElementById('overlay');
-  var overlayTitle = document.getElementById('overlayTitle');
-  var overlayHint = document.getElementById('overlayHint');
-  var overlayBtn = document.getElementById('overlayBtn');
-
-  function updateSizes() {
-    W = window.innerWidth;
-    H = window.innerHeight;
-    road.w = Math.min(W * 0.6, 400);
-    road.x = (W - road.w) / 2;
-    player.w = road.w * 0.16;
-    player.h = player.w * 1.6;
-    player.x = W / 2 - player.w / 2;
-    player.y = H - player.h - 100;
-    lines = [];
-    for (var i = 0; i < 10; i++) {
-      lines.push({ y: i * (H / 8), offset: 0 });
-    }
-  }
-
   function reset() {
-    updateSizes();
+    resize();
     obstacles = [];
     score = 0;
     scoreEl.textContent = '0';
-    speed = 6;
+    speed = 7;
     spawnTimer = 0;
     state = 'playing';
     overlay.classList.remove('show');
@@ -184,8 +189,8 @@ ${audRuntime}
   }
 
   function step() {
-    if (keys.left) player.x -= 5;
-    if (keys.right) player.x += 5;
+    if (keys.left) player.x -= 7;
+    if (keys.right) player.x += 7;
     if (player.x < road.x) player.x = road.x;
     if (player.x + player.w > road.x + road.w) player.x = road.x + road.w - player.w;
 
@@ -214,8 +219,8 @@ ${audRuntime}
     spawnTimer -= 16;
     if (spawnTimer <= 0) {
       spawnObstacle();
-      spawnTimer = Math.max(400, 1200 - score * 2);
-      speed = Math.min(15, 6 + score * 0.008);
+      spawnTimer = Math.max(500, 1300 - score * 2);
+      speed = Math.min(16, 7 + score * 0.01);
     }
   }
 
@@ -227,48 +232,54 @@ ${audRuntime}
     sound('gameOver');
   }
 
-  var startTs = performance.now();
-  var lastTick = 0;
+  function drawEmoji(emoji, x, y, size) {
+    ctx.font = Math.round(size) + 'px serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(emoji, x, y);
+  }
 
   function render() {
     var time = performance.now() - startTs;
     __drawBackground(ctx, __cfg.background, W, H, time);
 
+    // Дорога
     ctx.fillStyle = __cfg.colors.surface;
     ctx.fillRect(road.x, 0, road.w, H);
     ctx.fillStyle = __cfg.colors.primary;
     ctx.fillRect(road.x - 4, 0, 4, H);
     ctx.fillRect(road.x + road.w, 0, 4, H);
 
+    // Разметка
     ctx.fillStyle = __cfg.colors.accent;
     for (var i = 0; i < lines.length; i++) {
       ctx.fillRect(W / 2 - 3, lines[i].y, 6, H / 20);
     }
 
+    // Препятствия — отдельный emoji или фигура
     var obsSprite = __cfg.sprites && __cfg.sprites.obstacle;
+    var obsEmoji = (obsSprite && obsSprite.type === 'emoji' && obsSprite.emoji) ? obsSprite.emoji : OBSTACLE_EMOJI_DEFAULT;
     for (var k = 0; k < obstacles.length; k++) {
       var o = obstacles[k];
-      if (obsSprite && obsSprite.type === 'emoji' && obsSprite.emoji) {
-        ctx.font = Math.round(o.w) + 'px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(obsSprite.emoji, o.x + o.w / 2, o.y + o.h / 2);
-      } else {
-        ctx.fillStyle = __cfg.colors.accent;
-        ctx.fillRect(o.x, o.y, o.w, o.h);
-      }
+      drawEmoji(obsEmoji, o.x + o.w / 2, o.y + o.h / 2, o.h * 0.95);
     }
 
+    // Игрок — ВСЕГДА отдельный emoji, с обводкой
     var pSprite = __cfg.sprites && __cfg.sprites.player;
-    if (pSprite && pSprite.type === 'emoji' && pSprite.emoji) {
-      ctx.font = Math.round(player.w * 1.5) + 'px serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(pSprite.emoji, player.x + player.w / 2, player.y + player.h / 2);
-    } else {
-      ctx.fillStyle = __cfg.colors.primary;
-      ctx.fillRect(player.x, player.y, player.w, player.h);
-    }
+    var pEmoji = (pSprite && pSprite.type === 'emoji' && pSprite.emoji) ? pSprite.emoji : PLAYER_EMOJI_DEFAULT;
+
+    // Обводка игрока — чтобы точно отличать
+    var px = player.x + player.w / 2;
+    var py = player.y + player.h / 2;
+    ctx.beginPath();
+    ctx.arc(px, py, player.w * 0.8, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fill();
+    ctx.strokeStyle = __cfg.colors.primary;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    drawEmoji(pEmoji, px, py, player.w * 1.6);
   }
 
   function loop(now) {
@@ -284,8 +295,9 @@ ${audRuntime}
   overlayBtn.addEventListener('click', function(e) { e.preventDefault(); reset(); });
   overlayBtn.addEventListener('touchstart', function(e) { e.preventDefault(); reset(); }, { passive: false });
 
-  resize();
-  window.addEventListener('resize', function() { resize(); reset(); });
+  window.addEventListener('resize', function() { resize(); });
+  window.addEventListener('orientationchange', function() { setTimeout(resize, 200); });
+
   reset();
   requestAnimationFrame(loop);
 })();

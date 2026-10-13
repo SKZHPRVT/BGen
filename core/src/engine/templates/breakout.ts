@@ -1,5 +1,6 @@
 /**
  * Шаблон «Breakout» — сбей кирпичи.
+ * Мяч, платформа и кирпичи рисуются с контрастной обводкой.
  */
 import type { GameConfig } from "../types.ts";
 import { backgroundRuntime, backgroundCSS, spritesRuntime, audioRuntime } from "../render/index.ts";
@@ -74,14 +75,36 @@ ${audRuntime}
   var canvas = document.getElementById('game');
   var ctx = canvas.getContext('2d');
 
+  var W = 0, H = 0;
+  var paddle = { x: 0, y: 0, w: 0, h: 0 };
+  var ball = { x: 0, y: 0, vx: 0, vy: 0, r: 0 };
+  var bricks = [];
+  var score = 0;
+  var lives = 3;
+  var state = 'playing';
+  var lastTick = 0;
+  var startTs = performance.now();
+
+  var scoreEl = document.getElementById('score');
+  var overlay = document.getElementById('overlay');
+  var overlayTitle = document.getElementById('overlayTitle');
+  var overlayHint = document.getElementById('overlayHint');
+  var overlayBtn = document.getElementById('overlayBtn');
+
+  // Контрастный цвет мяча — белый с чёрной обводкой, чтобы читался на любом фоне
+  var BALL_FILL = '#ffffff';
+  var BALL_STROKE = '#000000';
+
   function resize() {
     var dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
-    canvas.style.width = window.innerWidth + 'px';
-    canvas.style.height = window.innerHeight + 'px';
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    __initBackground(__cfg.background, window.innerWidth, window.innerHeight);
+    __initBackground(__cfg.background, W, H);
   }
 
   __initAudio(__cfg.audio && __cfg.audio.enabled, __cfg.audio && __cfg.audio.volume);
@@ -91,44 +114,24 @@ ${audRuntime}
     __playSound(type);
   }
 
-  var W = 0, H = 0;
-  var paddle = { x: 0, y: 0, w: 0, h: 0 };
-  var ball = { x: 0, y: 0, vx: 0, vy: 0, r: 0 };
-  var bricks = [];
-  var score = 0;
-  var lives = 3;
-  var state = 'playing';
-
-  var scoreEl = document.getElementById('score');
-  var overlay = document.getElementById('overlay');
-  var overlayTitle = document.getElementById('overlayTitle');
-  var overlayHint = document.getElementById('overlayHint');
-  var overlayBtn = document.getElementById('overlayBtn');
-
-  function updateSizes() {
-    W = window.innerWidth;
-    H = window.innerHeight;
-  }
-
   function reset() {
-    updateSizes();
+    resize();
     paddle.w = W * 0.28;
     paddle.h = Math.max(16, H * 0.02);
     paddle.x = (W - paddle.w) / 2;
     paddle.y = H - paddle.h - 60;
 
-    ball.r = Math.max(8, W * 0.018);
+    ball.r = Math.max(9, W * 0.02);
     ball.x = W / 2;
-    ball.y = paddle.y - ball.r - 5;
+    ball.y = paddle.y - ball.r - 6;
     ball.vx = 4 * (Math.random() > 0.5 ? 1 : -1);
     ball.vy = -6;
 
-    // Кирпичи — 5 рядов
     bricks = [];
     var cols = 6, rows = 5;
     var pad = 8;
     var bw = (W - pad * (cols + 1)) / cols;
-    var bh = Math.max(20, H * 0.03);
+    var bh = Math.max(22, H * 0.032);
     var offsetY = 100;
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
@@ -202,7 +205,7 @@ ${audRuntime}
       lives--;
       if (lives <= 0) return gameOver(false);
       ball.x = W / 2;
-      ball.y = paddle.y - ball.r - 5;
+      ball.y = paddle.y - ball.r - 6;
       ball.vx = 4 * (Math.random() > 0.5 ? 1 : -1);
       ball.vy = -6;
     }
@@ -218,39 +221,49 @@ ${audRuntime}
     sound(win ? 'win' : 'gameOver');
   }
 
-  var startTs = performance.now();
-  var lastTick = 0;
-
   function render() {
     var time = performance.now() - startTs;
     __drawBackground(ctx, __cfg.background, W, H, time);
 
-    // Кирпичи
+    // Кирпичи — с обводкой для контраста
     for (var i = 0; i < bricks.length; i++) {
       var b = bricks[i];
       if (!b.alive) continue;
       ctx.fillStyle = __cfg.colors.accent;
       ctx.fillRect(b.x, b.y, b.w, b.h);
-      ctx.strokeStyle = __cfg.colors.surface;
+      ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = 2;
-      ctx.strokeRect(b.x, b.y, b.w, b.h);
+      ctx.strokeRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
     }
 
-    // Платформа
+    // Платформа — с обводкой
     ctx.fillStyle = __cfg.colors.primary;
     ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(paddle.x, paddle.y, paddle.w, paddle.h);
 
-    // Мяч
-    ctx.fillStyle = __cfg.colors.text;
+    // Мяч — ВСЕГДА белый с чёрной обводкой (виден на любом фоне)
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+    ctx.fillStyle = BALL_FILL;
     ctx.fill();
+    ctx.strokeStyle = BALL_STROKE;
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
-    // Жизни — emoji или текст
+    // Свечение вокруг мяча (для тёмных тем)
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, ball.r + 4, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Жизни
     ctx.font = Math.round(Math.max(20, H * 0.025)) + 'px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = __cfg.colors.text;
+    ctx.fillStyle = '#ffffff';
     ctx.fillText('❤️ ' + lives, 20, 20);
   }
 
@@ -267,8 +280,9 @@ ${audRuntime}
   overlayBtn.addEventListener('click', function(e) { e.preventDefault(); reset(); });
   overlayBtn.addEventListener('touchstart', function(e) { e.preventDefault(); reset(); }, { passive: false });
 
-  resize();
-  window.addEventListener('resize', function() { resize(); reset(); });
+  window.addEventListener('resize', function() { resize(); });
+  window.addEventListener('orientationchange', function() { setTimeout(resize, 200); });
+
   reset();
   requestAnimationFrame(loop);
 })();
