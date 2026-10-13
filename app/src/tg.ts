@@ -2,6 +2,12 @@
  * Обёртка Telegram.WebApp.
  * Работает в трёх режимах: telegram, web, embed.
  * Отвечает за: fullscreen, viewport-height, safe-area, haptic.
+ *
+ * Fullscreen в TMA:
+ *   1. tg.ready() — сообщаем Telegram, что приложение готово
+ *   2. tg.expand() — разворачиваем на весь WebView
+ *   3. tg.disableVerticalSwipes() — отключаем закрытие TMA свайпом вниз
+ *   4. Синхронизируем --tg-viewport-height с реальной высотой
  */
 
 import { platform } from "./platform.ts";
@@ -35,6 +41,12 @@ interface TelegramWebApp {
     notificationOccurred: (type: "error" | "success" | "warning") => void;
     selectionChanged: () => void;
   };
+  CloudStorage?: {
+    setItem: (key: string, value: string, cb?: (err: Error | null, ok?: boolean) => void) => void;
+    getItem: (key: string, cb: (err: Error | null, value?: string) => void) => void;
+    removeItem: (key: string, cb?: (err: Error | null, ok?: boolean) => void) => void;
+  };
+  switchInlineQuery?: (query: string, chooseChatTypes?: string[]) => void;
 }
 
 declare global {
@@ -59,20 +71,33 @@ export function initPlatform(): void {
   if (platform.isTelegram && tg) {
     document.body.classList.add("is-telegram");
 
+    // Fullscreen цепочка
     safeCall(() => tg.ready());
     safeCall(() => tg.expand());
+
+    // Отключаем свайп-закрытие TMA (Bot API 7.7+)
     safeCall(() => tg.disableVerticalSwipes?.());
+
+    // Цвета шапки Telegram — совпадаем с фоном приложения
     safeCall(() => tg.setHeaderColor("#ffffff"));
     safeCall(() => tg.setBackgroundColor("#ffffff"));
 
+    // Высота viewport
     applyViewportHeight();
     safeCall(() => tg.onEvent("viewportChanged", applyViewportHeight));
     window.addEventListener("resize", applyViewportHeight);
     window.addEventListener("orientationchange", () => setTimeout(applyViewportHeight, 300));
 
+    // Telegram Desktop иногда не отдаёт финальную высоту сразу —
+    // дергаем ещё раз через 200мс и 1с
+    setTimeout(applyViewportHeight, 200);
+    setTimeout(applyViewportHeight, 1000);
+
     console.log("[BGen] Telegram WebApp initialized", {
       version: tg.version,
+      platform: tg.platform,
       viewportHeight: tg.viewportHeight,
+      viewportStableHeight: tg.viewportStableHeight,
       isExpanded: tg.isExpanded,
     });
     return;
