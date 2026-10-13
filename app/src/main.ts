@@ -9,9 +9,17 @@ import { mountIteration, showIteration, setIterationLoading } from "./ui/iterati
 import { mountGallery, renderGallery } from "./ui/gallery.ts";
 import { shareGame } from "./ui/share.ts";
 import { exportGame } from "./ui/export.ts";
+import { runPreloader } from "./ui/preloader.ts";
 
 initPlatform();
 
+// Запускаем прелоадер. После его завершения показываем основной UI.
+runPreloader().then(() => {
+  console.log(`[BGen] App ready in ${platform.kind} mode`);
+});
+
+// === Инициализация UI только после показа приложения ===
+// Но обработчики можно навесить заранее — элементы будут видны после прелоадера.
 const promptEl = mountPromptInput();
 const previewEl = mountPreview();
 const iterationEl = mountIteration();
@@ -54,7 +62,7 @@ async function onGenerate(): Promise<void> {
   }
 
   haptic("medium");
-  store.set({ loading: true, status: "Генерирую игру", statusType: "info" });
+  store.set({ loading: true, status: "Генерирую игру… (это может занять 30-60 секунд)", statusType: "info" });
 
   try {
     const res = await generate({
@@ -78,10 +86,11 @@ async function onGenerate(): Promise<void> {
     haptic("success");
     const cacheMsg = res.fromCache ? " (из кэша)" : "";
     const warnMsg = res.warnings.length > 0 ? `, ${res.warnings.length} предупреждений` : "";
+    const okMsg = res.ok ? "" : " (с оговорками)";
     store.set({
       loading: false,
-      status: `Готово за ${res.durationMs}мс${cacheMsg}${warnMsg}`,
-      statusType: "success",
+      status: `Готово за ${res.durationMs}мс${cacheMsg}${warnMsg}${okMsg}`,
+      statusType: res.ok ? "success" : "info",
     });
   } catch (e) {
     haptic("error");
@@ -99,7 +108,7 @@ async function onIterate(): Promise<void> {
   }
 
   haptic("medium");
-  store.set({ loading: true, status: "Дорабатываю игру", statusType: "info" });
+  store.set({ loading: true, status: "Дорабатываю игру…", statusType: "info" });
   setIterationLoading(iterationEl, true);
 
   try {
@@ -140,10 +149,7 @@ async function onShare(): Promise<void> {
   if (!lastGame) return;
   const res = await shareGame(lastGame);
   if (res.ok) {
-    store.set({
-      status: res.message ?? "Ссылка для шаринга готова",
-      statusType: "success",
-    });
+    store.set({ status: res.message ?? "Ссылка готова", statusType: "success" });
   } else if (res.message) {
     store.set({ status: res.message, statusType: "error" });
   }
@@ -153,15 +159,9 @@ async function onExport(): Promise<void> {
   if (!lastGame) return;
   const res = await exportGame(lastGame);
   if (res.ok) {
-    store.set({
-      status: res.message ?? `Файл ${res.filename} сохранён`,
-      statusType: "success",
-    });
+    store.set({ status: res.message ?? `Файл ${res.filename} сохранён`, statusType: "success" });
   } else {
-    store.set({
-      status: res.message ?? "Не удалось экспортировать",
-      statusType: "error",
-    });
+    store.set({ status: res.message ?? "Не удалось экспортировать", statusType: "error" });
   }
 }
 
@@ -190,5 +190,4 @@ if (exportBtn) exportBtn.addEventListener("click", onExport);
 
 (async () => {
   await store.load();
-  console.log(`[BGen] Ready in ${platform.kind} mode`);
 })();

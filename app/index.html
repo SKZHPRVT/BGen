@@ -3,15 +3,38 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="theme-color" content="#111111" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <title>BGen — ИИ-генератор игр</title>
-  <!-- Telegram SDK: грузится всегда, но вне Telegram становится no-op -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div id="app">
+  <!-- ============================================ -->
+  <!-- ПРЕЛОАДЕР: показывается при открытии          -->
+  <!-- ============================================ -->
+  <div id="preloader" class="preloader">
+    <div class="preloader-content">
+      <!-- [BE......] — прогресс-бар буквами -->
+      <div class="bee-bar">
+        <span class="bee-bracket">[</span>
+        <span id="bee-letters" class="bee-letters">BE······</span>
+        <span class="bee-bracket">]</span>
+      </div>
+
+      <!-- Пиксельный шарик, собирается из хаоса -->
+      <canvas id="bee-ball" class="bee-ball" width="240" height="240"></canvas>
+
+      <!-- GEN появляется внизу -->
+      <div id="bee-gen" class="bee-gen"></div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ                           -->
+  <!-- ============================================ -->
+  <div id="app" class="app-root" hidden>
     <header class="bgen-header">
       <h1>🎮 BGen</h1>
       <p class="subtitle">ИИ-генератор браузерных игр</p>
