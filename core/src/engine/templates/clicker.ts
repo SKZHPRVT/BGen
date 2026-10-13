@@ -1,6 +1,5 @@
 /**
  * Шаблон «Кликер».
- * Управление, механика, апгрейды — наши. Меняются цвета, эмодзи, тексты.
  */
 import type { GameConfig } from "../types.ts";
 import { backgroundRuntime, backgroundCSS, spritesRuntime, audioRuntime } from "../render/index.ts";
@@ -45,17 +44,18 @@ export function buildClickerGame(cfg: GameConfig): string {
   }
   #hud {
     position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
     left: 50%;
     transform: translateX(-50%);
     font-size: ${Math.max(fontSize + 6, 26)}px;
     font-weight: 800;
     color: ${colors.text};
-    background: rgba(0,0,0,0.4);
-    padding: 10px 24px;
-    border-radius: 16px;
+    background: ${colors.surface};
+    padding: 8px 22px;
+    border-radius: 14px;
     z-index: 10;
     pointer-events: none;
+    border: 2px solid ${colors.primary};
   }
   #clicker-area {
     position: fixed;
@@ -69,11 +69,11 @@ export function buildClickerGame(cfg: GameConfig): string {
     -webkit-tap-highlight-color: transparent;
   }
   #clicker-emoji {
-    font-size: 40vmin;
+    font-size: 30vmin;
     line-height: 1;
     user-select: none;
     transition: transform 0.08s ease-out;
-    filter: drop-shadow(0 8px 24px rgba(0,0,0,0.3));
+    filter: drop-shadow(0 8px 24px rgba(0,0,0,0.4));
   }
   #clicker-emoji.pressed { transform: scale(0.9); }
   #upgrades {
@@ -91,20 +91,25 @@ export function buildClickerGame(cfg: GameConfig): string {
     font-size: ${Math.max(fontSize - 2, 14)}px;
     font-weight: 700;
     border-radius: 14px;
-    border: 2px solid rgba(255,255,255,0.3);
-    background: rgba(255,255,255,0.15);
-    color: #fff;
+    border: 3px solid ${colors.primary};
+    background: ${colors.surface};
+    color: ${colors.text};
     cursor: pointer;
     font-family: inherit;
     min-height: ${buttonSize}px;
-    backdrop-filter: blur(6px);
     -webkit-tap-highlight-color: transparent;
-    transition: transform 0.08s;
+    transition: transform 0.08s, opacity 0.2s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
   }
-  .upgrade-btn:active { transform: scale(0.95); }
+  .upgrade-btn:active:not(:disabled) {
+    transform: scale(0.95);
+    background: ${colors.primary};
+    color: #fff;
+  }
   .upgrade-btn:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
+    border-color: ${colors.text}40;
   }
   #overlay {
     position: fixed; inset: 0;
@@ -202,7 +207,6 @@ ${audRuntime}
   var overlayHint = document.getElementById('overlayHint');
   var overlayBtn = document.getElementById('overlayBtn');
 
-  // Спрайт игрока из конфига
   if (__cfg.sprites && __cfg.sprites.player) {
     var sp = __cfg.sprites.player;
     if (sp.type === 'emoji' && sp.emoji) emojiEl.textContent = sp.emoji;
@@ -283,7 +287,6 @@ ${audRuntime}
       checkWin();
     }
 
-    // Фон
     __drawBackground(ctx, __cfg.background, window.innerWidth, window.innerHeight, time);
 
     requestAnimationFrame(loop);

@@ -1,6 +1,5 @@
 /**
  * Шаблон «Memory» — найди пары.
- * Управление, коллизии, победа — наши. Меняются эмодзи, цвета, тексты.
  */
 import type { GameConfig } from "../types.ts";
 import { backgroundRuntime, backgroundCSS, audioRuntime } from "../render/index.ts";
@@ -14,7 +13,6 @@ export function buildMemoryGame(cfg: GameConfig): string {
   const bgRuntime = backgroundRuntime();
   const audRuntime = audioRuntime();
 
-  // Эмодзи для карточек — из конфига или дефолт
   const emojiSet = pickEmojiSet(cfg);
 
   const runtimeConfig = { colors, texts, background, audio, emojiSet, fontSize, buttonSize };
@@ -49,11 +47,12 @@ export function buildMemoryGame(cfg: GameConfig): string {
     font-size: ${Math.max(fontSize + 4, 22)}px;
     font-weight: 700;
     color: ${colors.text};
-    background: rgba(0,0,0,0.4);
-    padding: 8px 20px;
+    background: ${colors.surface};
+    padding: 8px 22px;
     border-radius: 14px;
     z-index: 10;
     pointer-events: none;
+    border: 2px solid ${colors.primary};
   }
   #board {
     position: fixed;
@@ -70,27 +69,38 @@ export function buildMemoryGame(cfg: GameConfig): string {
     aspect-ratio: 1;
     border-radius: 14px;
     background: ${colors.surface};
-    border: 3px solid ${colors.primary};
+    border: 4px solid ${colors.primary};
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: ${Math.max(fontSize + 20, 40)}px;
     cursor: pointer;
-    transition: transform 0.15s, background 0.2s;
+    transition: transform 0.15s, background 0.2s, border-color 0.2s;
     -webkit-tap-highlight-color: transparent;
     color: transparent;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  }
+  .card:not(.matched):not(.open)::after {
+    content: '?';
+    color: ${colors.primary};
+    font-size: ${Math.max(fontSize + 4, 26)}px;
+    font-weight: 800;
+    opacity: 0.6;
   }
   .card.open {
-    background: ${colors.primary};
-    color: #fff;
-    transform: scale(1.03);
+    background: #ffffff;
+    border-color: ${colors.primary};
+    transform: scale(1.05);
+    color: #000;
   }
   .card.matched {
-    background: ${colors.accent};
+    background: ${colors.primary};
+    border-color: ${colors.primary};
     color: #fff;
-    opacity: 0.6;
+    opacity: 0.7;
     cursor: default;
   }
+  .card.matched::after { content: ''; }
   #overlay {
     position: fixed; inset: 0;
     display: none;
@@ -202,7 +212,9 @@ ${audRuntime}
       el.className = 'card';
       if (card.open) el.classList.add('open');
       if (card.matched) el.classList.add('matched');
-      el.textContent = card.open || card.matched ? card.emoji : '?';
+      if (card.open || card.matched) {
+        el.textContent = card.emoji;
+      }
       if (!card.matched && !card.open && !lock) {
         el.addEventListener('click', function() { flip(idx); });
       }
@@ -280,10 +292,7 @@ ${audRuntime}
 }
 
 function pickEmojiSet(cfg: GameConfig): string[] {
-  // Если в конфиге есть эмодзи для еды — используем его как "тему"
   if (cfg.sprites?.food?.type === "emoji" && cfg.sprites.food.emoji) {
-    const base = cfg.sprites.food.emoji;
-    // 8 эмодзи одной темы — из дефолтного набора
     return ["🍎", "🍇", "🍊", "🍋", "🍒", "🥝", "🍓", "🍑"];
   }
   if (cfg.sprites?.player?.type === "emoji" && cfg.sprites.player.emoji) {

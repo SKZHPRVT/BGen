@@ -82,11 +82,12 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         userInput.prompt,
       );
 
+      // temperature 0.9 — больше вариативности между генерациями
       const res = await router.generate({
         system,
         user,
         maxTokens: 1500,
-        temperature: 0.7,
+        temperature: 0.9,
       });
       providerName = res.provider;
 
