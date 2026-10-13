@@ -1,6 +1,5 @@
 /**
  * Промпт для LLM: key:value конфиг. Поля зависят от жанра и аудитории.
- * Добавлен блок вариативности, чтобы GigaChat каждый раз делал разные стили.
  */
 import type { Genre, Audience } from "../types.ts";
 
@@ -24,12 +23,36 @@ export function buildConfigPrompt(
 
 ${fieldsBlock}
 
+ВАЖНЫЕ ПРАВИЛА ПРО ЭМОДЗИ:
+
+1. emojiPlayer — emoji ДВИЖУЩЕГОСЯ объекта (игрока, машины, персонажа).
+   ЭТО НЕ ДОЛЖНО БЫТЬ: дорога, трасса, путь, стена, сетка, поле, фон.
+   Примеры для жанров:
+   - snake: 🐍 или 🐛 или 🚀
+   - runner: 🏃 или 🏃‍♂️ или 🦘 или 🐇
+   - racing: 🏎️ или 🚗 или 🚙 или 🏍️
+   - platformer: 🧍 или 🐱 или 🤖
+   - tanks: 🚀 или 🛸 или 🚁
+   - fighting: 🥷 или 🦸 или 🥊
+   - clicker: 🐱 или 🍪 или 🎁
+
+2. emojiFood — emoji ЦЕЛИ или награды (что игрок собирает, за чем гонится).
+   Примеры:
+   - snake: 🍎 🍒 🍇
+   - runner: ⭐ 🪙 🌟
+   - racing: 🏁 или пропусти (для гонок)
+   - platformer: 🪙 💎 ⭐
+   - tanks: 👾 🎯 (цель)
+   - clicker: 🍪 или пропусти
+
+3. НЕ используй одинаковый emoji для игрока и препятствий.
+4. НЕ используй эмодзи дороги/трассы/пути в качестве игрока.
+
 ГЛАВНОЕ ПРАВИЛО ВАРИАТИВНОСТИ:
 Тебя могут вызывать много раз с одинаковым запросом. Каждый раз придумывай РАЗНОЕ:
-- Название — другие слова, эпитеты, рифмы. Не «Кликер с котиками» дважды.
-- Палитра — тёплая / холодная / тёмная / пастельная / неоновая. Каждый раз другая.
+- Название — другие слова, эпитеты, рифмы.
+- Палитра — тёплая / холодная / тёмная / пастельная / неоновая.
 - Настроение — уютное / космическое / сказочное / киберпанк / минимализм.
-- Тема — если в промпте «котики», можешь взять собак, рыбок, ёжиков как альтернативу, если жанр позволяет.
 
 ПРИМЕР (12 строк):
 ${exampleForGenre(genre)}
@@ -42,23 +65,24 @@ ${exampleForGenre(genre)}
 Сид для вариативности: ${randomSeed}
 Время: ${Date.now()}
 
-Придумай СВЕЖИЙ, ОРИГИНАЛЬНЫЙ стиль, не совпадающий с типичными шаблонами.
+Придумай СВЕЖИЙ, ОРИГИНАЛЬНЫЙ стиль.
+Для emojiPlayer используй emoji ДВИЖУЩЕГОСЯ объекта (не дороги, не стены).
 Заполни поля. Только "ключ: значение".`;
 
   return { system, user };
 }
 
 function getFieldsForGenre(genre: Genre, audience: Audience): string {
-  const common = `1. title — название на русском, до 30 символов, отражает промпт
-2. speed — ${speedRange(audience)} (для grid-игр — пауза между шагами; для кликера/2048 не критично)
-3. gridSize — ${gridRange(audience)} (размер сетки, для snake/memory/2048)
+  const common = `1. title — название на русском, до 30 символов
+2. speed — ${speedRange(audience)}
+3. gridSize — ${gridRange(audience)}
 4. bg — hex-цвет фона #RRGGBB, ${bgHint(audience)}
-5. surface — hex-цвет игрового поля, чуть темнее bg
+5. surface — hex-цвет игрового поля
 6. primary — hex-цвет игрока/основного элемента
 7. accent — hex-цвет еды/цели/препятствия
 8. text — hex-цвет текста, ${textHint(audience)}
-9. emojiFood — один emoji для еды/цели (🍎 🌟 🍕) или пусто
-10. emojiPlayer — один emoji для игрока или пусто
+9. emojiFood — emoji для еды/цели (🍎 🌟 🍕) или пусто
+10. emojiPlayer — emoji ДВИЖУЩЕГОСЯ ИГРОКА (🐍 🏃 🏎️ 🥷), НЕ дороги/стены
 11. gameOverTitle — текст при проигрыше, короткий
 12. restartButton — надпись кнопки рестарта, до 15 символов`;
 
@@ -79,7 +103,7 @@ primary: #2a7f62
 accent: #c0392b
 text: #2c1810
 emojiFood: 🍎
-emojiPlayer: 
+emojiPlayer: 🐍
 gameOverTitle: Игра окончена
 restartButton: Заново`;
 
@@ -97,6 +121,34 @@ emojiPlayer: 🐱
 gameOverTitle: Хватит!
 restartButton: Заново
 clickerEmoji: 🐱`;
+  }
+  if (genre === "racing") {
+    return `title: Космические гонки
+speed: 150
+gridSize: 16
+bg: #0a0a1a
+surface: #14142e
+primary: #7c3aed
+accent: #fbbf24
+text: #ffffff
+emojiFood: 🏁
+emojiPlayer: 🏎️
+gameOverTitle: Авария
+restartButton: Заново`;
+  }
+  if (genre === "runner") {
+    return `title: Космический бегун
+speed: 150
+gridSize: 16
+bg: #0a0a1a
+surface: #14142e
+primary: #7c3aed
+accent: #fbbf24
+text: #ffffff
+emojiFood: ⭐
+emojiPlayer: 🏃
+gameOverTitle: Упал
+restartButton: Заново`;
   }
   return base;
 }

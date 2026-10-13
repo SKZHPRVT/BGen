@@ -1,6 +1,6 @@
 /**
  * Шаблон «Гонки».
- * Игрок рисуется с обводкой, чтобы отличаться от препятствий.
+ * Fallback: если emojiPlayer — что-то похожее на дорогу/трассу, заменяем на 🏎️.
  */
 import type { GameConfig } from "../types.ts";
 import { backgroundRuntime, backgroundCSS, spritesRuntime, audioRuntime } from "../render/index.ts";
@@ -58,7 +58,6 @@ export function buildRacingGame(cfg: GameConfig): string {
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     display: flex; align-items: center; justify-content: center;
-    transition: transform 0.08s, background 0.15s;
   }
   #controls button:active { background: ${colors.primary}; color: #fff; transform: scale(0.95); }
   #overlay {
@@ -111,15 +110,34 @@ ${audRuntime}
   var lastTick = 0;
   var startTs = performance.now();
 
+  // Список эмодзи, которые НЕ могут быть игроком (дорога, трасса, финиш)
+  var BAD_PLAYER_EMOJIS = ['🛣️', '🛣', '🏁', '🚦', '🚧', '🛤️', '🛤', '🛑', '⬛', '🟫', '🟤'];
+  var DEFAULT_PLAYER = '🏎️';
+  var DEFAULT_OBSTACLE = '🪨';
+
+  function fixPlayerEmoji(raw) {
+    if (!raw) return DEFAULT_PLAYER;
+    // Если GigaChat дал эмодзи дороги/трассы — заменяем
+    for (var i = 0; i < BAD_PLAYER_EMOJIS.length; i++) {
+      if (raw.indexOf(BAD_PLAYER_EMOJIS[i]) === 0) return DEFAULT_PLAYER;
+    }
+    return raw;
+  }
+
+  var playerEmoji = fixPlayerEmoji(
+    __cfg.sprites && __cfg.sprites.player && __cfg.sprites.player.type === 'emoji'
+      ? __cfg.sprites.player.emoji
+      : DEFAULT_PLAYER
+  );
+  var obstacleEmoji = (__cfg.sprites && __cfg.sprites.obstacle && __cfg.sprites.obstacle.type === 'emoji' && __cfg.sprites.obstacle.emoji)
+    ? __cfg.sprites.obstacle.emoji
+    : DEFAULT_OBSTACLE;
+
   var scoreEl = document.getElementById('score');
   var overlay = document.getElementById('overlay');
   var overlayTitle = document.getElementById('overlayTitle');
   var overlayHint = document.getElementById('overlayHint');
   var overlayBtn = document.getElementById('overlayBtn');
-
-  // Эмодзи по умолчанию для игрока (чтобы отличать от препятствий)
-  var PLAYER_EMOJI_DEFAULT = '🏎️';
-  var OBSTACLE_EMOJI_DEFAULT = '🪨';
 
   function resize() {
     var dpr = window.devicePixelRatio || 1;
@@ -134,8 +152,8 @@ ${audRuntime}
 
     road.w = Math.min(W * 0.6, 400);
     road.x = (W - road.w) / 2;
-    player.w = road.w * 0.18;
-    player.h = player.w * 1.6;
+    player.w = road.w * 0.2;
+    player.h = player.w * 1.4;
     player.x = W / 2 - player.w / 2;
     player.y = H - player.h - 100;
     lines = [];
@@ -182,8 +200,8 @@ ${audRuntime}
   });
 
   function spawnObstacle() {
-    var w = road.w * (0.12 + Math.random() * 0.08);
-    var h = w * 1.6;
+    var w = road.w * (0.14 + Math.random() * 0.08);
+    var h = w * 1.2;
     var x = road.x + Math.random() * (road.w - w);
     obstacles.push({ x: x, y: -h, w: w, h: h });
   }
@@ -205,8 +223,8 @@ ${audRuntime}
 
     for (var k = 0; k < obstacles.length; k++) {
       var o = obstacles[k];
-      if (player.x + player.w > o.x && player.x < o.x + o.w &&
-          player.y + player.h > o.y && player.y < o.y + o.h) {
+      if (player.x + player.w * 0.7 > o.x && player.x + player.w * 0.3 < o.x + o.w &&
+          player.y + player.h * 0.7 > o.y && player.y + player.h * 0.3 < o.y + o.h) {
         return gameOver();
       }
     }
@@ -256,30 +274,26 @@ ${audRuntime}
       ctx.fillRect(W / 2 - 3, lines[i].y, 6, H / 20);
     }
 
-    // Препятствия — отдельный emoji или фигура
-    var obsSprite = __cfg.sprites && __cfg.sprites.obstacle;
-    var obsEmoji = (obsSprite && obsSprite.type === 'emoji' && obsSprite.emoji) ? obsSprite.emoji : OBSTACLE_EMOJI_DEFAULT;
+    // Препятствия
     for (var k = 0; k < obstacles.length; k++) {
       var o = obstacles[k];
-      drawEmoji(obsEmoji, o.x + o.w / 2, o.y + o.h / 2, o.h * 0.95);
+      drawEmoji(obstacleEmoji, o.x + o.w / 2, o.y + o.h / 2, o.h * 0.9);
     }
 
-    // Игрок — ВСЕГДА отдельный emoji, с обводкой
-    var pSprite = __cfg.sprites && __cfg.sprites.player;
-    var pEmoji = (pSprite && pSprite.type === 'emoji' && pSprite.emoji) ? pSprite.emoji : PLAYER_EMOJI_DEFAULT;
-
-    // Обводка игрока — чтобы точно отличать
+    // Игрок — с обводкой, точно отделён от препятствий
     var px = player.x + player.w / 2;
     var py = player.y + player.h / 2;
+    // Свечение
     ctx.beginPath();
-    ctx.arc(px, py, player.w * 0.8, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.arc(px, py, player.w * 0.9, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.fill();
+    // Рамка
     ctx.strokeStyle = __cfg.colors.primary;
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    drawEmoji(pEmoji, px, py, player.w * 1.6);
+    drawEmoji(playerEmoji, px, py, player.w * 1.7);
   }
 
   function loop(now) {
