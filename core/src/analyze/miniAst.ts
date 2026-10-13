@@ -1,3 +1,8 @@
+/**
+ * Лёгкий "AST" для HTML-игры. Не настоящий парсер — набор эвристик,
+ * которые дают структурную картину кода без зависимостей.
+ */
+
 export interface MiniAst {
   hasCanvas: boolean;
   hasRequestAnimationFrame: boolean;
@@ -18,6 +23,8 @@ export interface MiniAst {
   lineCount: number;
   charCount: number;
   states: string[];
+  /** Сырой HTML игры — нужен для дополнительных проверок */
+  raw: string;
 }
 
 const STATE_WORDS = [
@@ -28,6 +35,7 @@ const STATE_WORDS = [
 
 export function buildMiniAst(html: string): MiniAst {
   const lower = html.toLowerCase();
+
   const states = STATE_WORDS.filter((s) =>
     new RegExp(`['"\`]${s}['"\`]`, "i").test(html),
   );
@@ -59,5 +67,6 @@ export function buildMiniAst(html: string): MiniAst {
     lineCount: html.split("\n").length,
     charCount: html.length,
     states,
+    raw: html,
   };
 }

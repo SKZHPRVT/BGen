@@ -16,12 +16,31 @@ export class SemanticCache {
     this.ttlMs = opts.ttlMs ?? 24 * 60 * 60 * 1000;
   }
 
+  /**
+   * Ключ кэша.
+   *
+   * Включает:
+   *  - жанр, аудиторию, тему — структурные признаки
+   *  - механики — отсортированные, чтобы порядок не влиял
+   *  - сырой промпт (нормализованный) — чтобы разные формулировки
+   *    в рамках одного жанра давали разные ключи
+   *
+   * Это фикс бага: раньше "змейка для бабушки" и "змейка для детей"
+   * могли пересекаться, если совпадали genre+audience+mechanics.
+   * Теперь ключ включает уникальность промпта.
+   */
   key(spec: GameSpec): string {
+    const normalizedPrompt = spec.rawPrompt
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
     return hashKey([
       spec.genre,
       spec.audience,
       spec.theme ?? "",
       [...spec.mechanics].sort().join("+"),
+      normalizedPrompt,
     ]);
   }
 
@@ -51,8 +70,14 @@ export class SemanticCache {
     this.map.set(k, { html, spec, createdAt: Date.now(), hits: 0 });
   }
 
-  size(): number { return this.map.size; }
-  clear(): void { this.map.clear(); }
+  size(): number {
+    return this.map.size;
+  }
+
+  clear(): void {
+    this.map.clear();
+  }
+
   stats(): { size: number; totalHits: number } {
     let totalHits = 0;
     for (const e of this.map.values()) totalHits += e.hits;
