@@ -1,13 +1,14 @@
 /**
  * Обёртка Telegram.WebApp.
  * Работает в трёх режимах: telegram, web, embed.
- * Отвечает за: fullscreen, viewport-height, safe-area, haptic.
  *
  * Fullscreen в TMA:
  *   1. tg.ready() — сообщаем Telegram, что приложение готово
  *   2. tg.expand() — разворачиваем на весь WebView
- *   3. tg.disableVerticalSwipes() — отключаем закрытие TMA свайпом вниз
- *   4. Синхронизируем --tg-viewport-height с реальной высотой
+ *   3. tg.requestFullscreen() — Bot API 8.0+, разворачивает на весь экран
+ *                                без шапки Telegram
+ *   4. tg.disableVerticalSwipes() — отключаем закрытие TMA свайпом
+ *   5. Синхронизируем --tg-viewport-height с реальной высотой
  */
 
 import { platform } from "./platform.ts";
@@ -25,6 +26,7 @@ interface TelegramWebApp {
   viewportHeight: number;
   viewportStableHeight: number;
   isExpanded: boolean;
+  isFullscreen?: boolean;
   ready: () => void;
   expand: () => void;
   close: () => void;
@@ -65,17 +67,30 @@ function safeCall<T>(fn: () => T): T | undefined {
 function applyViewportHeight(): void {
   const h = tg?.viewportStableHeight || tg?.viewportHeight || window.innerHeight;
   document.documentElement.style.setProperty("--tg-viewport-height", `${h}px`);
+  document.documentElement.style.setProperty("--real-vh", `${h}px`);
 }
 
 export function initPlatform(): void {
   if (platform.isTelegram && tg) {
     document.body.classList.add("is-telegram");
 
-    // Fullscreen цепочка
+    // 1. Сообщаем что приложение готово
     safeCall(() => tg.ready());
+
+    // 2. Разворачиваем на весь WebView (без шапки Telegram сверху)
     safeCall(() => tg.expand());
 
-    // Отключаем свайп-закрытие TMA (Bot API 7.7+)
+    // 3. Bot API 8.0+: полный экран без шапки Telegram
+    if (typeof tg.requestFullscreen === "function") {
+      try {
+        tg.requestFullscreen();
+        console.log("[BGen] requestFullscreen called");
+      } catch (e) {
+        console.log("[BGen] requestFullscreen failed:", e);
+      }
+    }
+
+    // 4. Отключаем закрытие TMA свайпом вниз (Bot API 7.7+)
     safeCall(() => tg.disableVerticalSwipes?.());
 
     // Цвета шапки Telegram — совпадаем с фоном приложения
@@ -85,13 +100,18 @@ export function initPlatform(): void {
     // Высота viewport
     applyViewportHeight();
     safeCall(() => tg.onEvent("viewportChanged", applyViewportHeight));
+
+    // Принудительный пересчёт через таймеры — Telegram Desktop иногда
+    // не отдаёт финальную высоту сразу
     window.addEventListener("resize", applyViewportHeight);
     window.addEventListener("orientationchange", () => setTimeout(applyViewportHeight, 300));
-
-    // Telegram Desktop иногда не отдаёт финальную высоту сразу —
-    // дергаем ещё раз через 200мс и 1с
     setTimeout(applyViewportHeight, 200);
     setTimeout(applyViewportHeight, 1000);
+
+    // visualViewport — критично для iOS, где открывается клавиатура
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", applyViewportHeight);
+    }
 
     console.log("[BGen] Telegram WebApp initialized", {
       version: tg.version,
@@ -99,6 +119,7 @@ export function initPlatform(): void {
       viewportHeight: tg.viewportHeight,
       viewportStableHeight: tg.viewportStableHeight,
       isExpanded: tg.isExpanded,
+      isFullscreen: tg.isFullscreen,
     });
     return;
   }
