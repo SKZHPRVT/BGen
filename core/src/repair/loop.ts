@@ -1,3 +1,11 @@
+/**
+ * Auto-repair loop.
+ * Генерирует игру, анализирует, при ошибках — просит LLM исправить.
+ *
+ * Возвращает финальный html и report. Если после maxAttempts попыток
+ * остались критические ошибки — report.ok будет false. Это сигнал
+ * вызывающему коду: игру не надо кэшировать и помечать как успешную.
+ */
 import type { AnalysisReport } from "../types.ts";
 import type { Router } from "../llm/router.ts";
 import { analyze } from "../analyze/report.ts";
@@ -93,6 +101,9 @@ export async function generateWithRepair(
     }
   }
 
+  // Все попытки исчерпаны, критические ошибки остались.
+  // Возвращаем как есть — report.ok = false, вызывающий код не должен
+  // кэшировать эту игру.
   return {
     html: lastHtml,
     report: lastReport!,

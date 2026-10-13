@@ -29,51 +29,49 @@ export type Genre =
 export type Audience = "default" | "elderly" | "kids" | "hardcore";
 
 // ─────────────────────────────────────────────────────────────
-// Механики — атомарные игровые свойства, влияющие на промпт
+// Механики
 // ─────────────────────────────────────────────────────────────
 
 export type Mechanic =
-  | "grow"          // объект растёт
-  | "collect"       // сбор предметов
-  | "avoid"         // избегание препятствий
-  | "jump"          // прыжки
-  | "match"         // сопоставление / тройки
-  | "tap"           // тап-действие
-  | "drag"          // перетаскивание
-  | "swipe"         // свайпы
-  | "combo"         // серии / комбо
-  | "timer"         // ограничение по времени
-  | "levels"        // уровни
-  | "upgrade"       // апгрейды
-  | "score"         // счёт
-  | "lives";        // жизни
+  | "grow"
+  | "collect"
+  | "avoid"
+  | "jump"
+  | "match"
+  | "tap"
+  | "drag"
+  | "swipe"
+  | "combo"
+  | "timer"
+  | "levels"
+  | "upgrade"
+  | "score"
+  | "lives";
 
 // ─────────────────────────────────────────────────────────────
-// Ограничения — технические требования
+// Ограничения
 // ─────────────────────────────────────────────────────────────
 
 export interface Constraints {
-  mobile?: boolean;          // touch-управление
-  noTimer?: boolean;         // без ограничения по времени
-  highContrast?: boolean;    // повышенный контраст
-  largeElements?: boolean;   // крупные элементы
-  colorblindSafe?: boolean;  // безопасные цвета
-  noSound?: boolean;         // без звука
+  mobile?: boolean;
+  noTimer?: boolean;
+  highContrast?: boolean;
+  largeElements?: boolean;
+  colorblindSafe?: boolean;
+  noSound?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────
-// GameSpec — результат классификации промпта
+// GameSpec
 // ─────────────────────────────────────────────────────────────
 
 export interface GameSpec {
   genre: Genre;
   audience: Audience;
-  theme?: string;               // "космос", "дача", "котики"
+  theme?: string;
   mechanics: Mechanic[];
   constraints: Constraints;
-  /** Исходный промпт пользователя, как есть */
   rawPrompt: string;
-  /** Уверенность классификатора 0..1 */
   confidence: number;
 }
 
@@ -83,9 +81,9 @@ export interface GameSpec {
 
 export interface UserInput {
   prompt: string;
-  audience?: Audience;         // если пользователь явно выбрал
+  audience?: Audience;
   theme?: string;
-  previousCode?: string;       // для итераций
+  previousCode?: string;
   previousPrompt?: string;
 }
 
@@ -115,6 +113,12 @@ export interface GenerateResult {
   repairedErrors: string[];
   /** Взято из кэша */
   fromCache: boolean;
+  /**
+   * Итоговый статус генерации:
+   *   true  — все критические проверки пройдены
+   *   false — после N попыток остались критические ошибки
+   */
+  ok: boolean;
   /** Примерное количество токенов */
   tokensUsed?: number;
   /** Длительность в мс */
@@ -129,7 +133,6 @@ export interface CompiledPrompt {
   system: string;
   user: string;
   spec: GameSpec;
-  /** Few-shot примеры, вставленные в промпт */
   examplesUsed: number;
 }
 
@@ -141,7 +144,6 @@ export interface InvariantIssue {
   id: string;
   severity: "error" | "warning";
   message: string;
-  /** Короткий совет для repair loop */
   hint?: string;
 }
 
@@ -149,7 +151,6 @@ export interface AnalysisReport {
   ok: boolean;
   errors: InvariantIssue[];
   warnings: InvariantIssue[];
-  /** Признаки, что это вообще игра */
   looksLikeGame: boolean;
   html: string;
   size: number;
@@ -169,7 +170,6 @@ export interface LLMRequest {
 
 export interface LLMProvider {
   readonly name: string;
-  /** Доступен ли провайдер прямо сейчас (ключ, URL и т.п.) */
   isAvailable(): boolean;
   generate(req: LLMRequest): Promise<string>;
   generateStream?(req: LLMRequest, onChunk: (t: string) => void): Promise<string>;

@@ -28,6 +28,26 @@ interface GenerateBody {
   stream?: boolean;
 }
 
+/**
+ * Валидация входящего промпта.
+ * Защита от injection, XSS, чрезмерных размеров.
+ */
+function validatePrompt(prompt: string): string | null {
+  if (!prompt) return "Field 'prompt' is required";
+  if (prompt.length > 500) return "Prompt is too long (max 500 chars)";
+  if (prompt.length < 2) return "Prompt is too short";
+
+  // Защита от попыток инъекций
+  if (/<\/?script/i.test(prompt)) return "Prompt contains forbidden tag";
+  if (/<iframe/i.test(prompt)) return "Prompt contains forbidden tag";
+  if (/<img[^>]*onerror/i.test(prompt)) return "Prompt contains forbidden pattern";
+
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x08\x0B\x0C\x0E-\x1F]/.test(prompt)) return "Prompt contains control characters";
+
+  return null;
+}
+
 generateRoute.post("/api/generate", async (c) => {
   let body: GenerateBody;
   try {
@@ -37,8 +57,8 @@ generateRoute.post("/api/generate", async (c) => {
   }
 
   const prompt = (body.prompt ?? "").trim();
-  if (!prompt) return c.json({ error: "Field 'prompt' is required" }, 400);
-  if (prompt.length > 500) return c.json({ error: "Prompt is too long (max 500 chars)" }, 400);
+  const validationError = validatePrompt(prompt);
+  if (validationError) return c.json({ error: validationError }, 400);
 
   const start = Date.now();
   try {
@@ -58,10 +78,14 @@ generateRoute.post("/api/generate", async (c) => {
       warnings: result.warnings,
       repairedErrors: result.repairedErrors,
       fromCache: result.fromCache,
+      ok: result.ok,
       durationMs: Date.now() - start,
     });
   } catch (e) {
-    logger.error("Generate failed", { error: (e as Error).message, prompt });
+    logger.error("Generate failed", {
+      error: (e as Error).message,
+      prompt: prompt.slice(0, 100),
+    });
     return c.json(
       {
         error: "Generation failed",
@@ -84,8 +108,12 @@ generateRoute.post("/api/iterate", async (c) => {
   const previousCode = body.previousCode ?? "";
   const previousPrompt = body.previousPrompt ?? "";
 
-  if (!newPrompt) return c.json({ error: "Field 'prompt' is required" }, 400);
+  const validationError = validatePrompt(newPrompt);
+  if (validationError) return c.json({ error: validationError }, 400);
   if (!previousCode) return c.json({ error: "Field 'previousCode' is required" }, 400);
+  if (previousCode.length > 200_000) {
+    return c.json({ error: "previousCode is too large" }, 400);
+  }
 
   try {
     const result = await generator.iterate(previousCode, previousPrompt, newPrompt);
@@ -96,6 +124,7 @@ generateRoute.post("/api/iterate", async (c) => {
       provider: result.provider,
       warnings: result.warnings,
       fromCache: false,
+      ok: result.ok,
       durationMs: result.durationMs,
     });
   } catch (e) {

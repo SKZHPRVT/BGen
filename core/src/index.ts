@@ -58,7 +58,11 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         typeof input === "string" ? { prompt: input } : input;
 
       const spec = classify(userInput);
-      logger.info("Generate request", { prompt: userInput.prompt, spec: spec.genre, audience: spec.audience });
+      logger.info("Generate request", {
+        prompt: userInput.prompt,
+        spec: spec.genre,
+        audience: spec.audience,
+      });
 
       // 1. Кэш
       if (opts.useCache !== false) {
@@ -74,6 +78,7 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
             warnings: [],
             repairedErrors: [],
             fromCache: true,
+            ok: true,
             durationMs: Date.now() - start,
           };
         }
@@ -87,7 +92,10 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         if (corpus.length > 0) {
           const retrieved = retrieveExamples(spec, corpus, { topK: 2 });
           examples = formatExamplesForPrompt(retrieved);
-          logger.info("Corpus retrieval", { found: retrieved.length, total: corpus.length });
+          logger.info("Corpus retrieval", {
+            found: retrieved.length,
+            total: corpus.length,
+          });
         }
       }
 
@@ -108,8 +116,9 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         },
       );
 
-      // 5. Кэш
-      if (result.report.ok && opts.useCache !== false) {
+      // 5. Кэш (только валидные игры)
+      const finalOk = result.report.ok;
+      if (finalOk && opts.useCache !== false) {
         cache.set(spec, result.html);
       }
 
@@ -118,7 +127,7 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
       logger.info("Generation done", {
         genre: spec.genre,
         attempts: result.attempts,
-        ok: result.report.ok,
+        ok: finalOk,
         durationMs,
       });
 
@@ -130,14 +139,27 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         warnings: result.report.warnings.map((w) => `${w.id}: ${w.message}`),
         repairedErrors: result.repairedErrors,
         fromCache: false,
+        ok: finalOk,
         durationMs,
       };
     },
 
     async iterate(previousCode, previousPrompt, newPrompt, opts = {}) {
+      // Классифицируем новый промпт
+      const newSpec = classify(newPrompt);
+
+      // Если жанр определён нечётко — наследуем контекст от предыдущего промпта.
+      // Это нужно, чтобы "добавь уровни" не превращалось в genre=unknown.
+      const isGeneric = newSpec.genre === "unknown";
+
+      const effectivePrompt =
+        isGeneric && previousPrompt
+          ? `${newPrompt} (игра: ${previousPrompt})`
+          : newPrompt;
+
       return this.generate(
         {
-          prompt: newPrompt,
+          prompt: effectivePrompt,
           previousCode,
           previousPrompt,
         },
