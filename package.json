@@ -2,10 +2,9 @@
   "name": "bgen",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["core", "server", "app"],
+  "workspaces": ["core", "server", "app", "tools"],
+  "packageManager": "bun@1.4.3",
   "scripts": {
-    "dev:server": "cd server && bun --watch src/index.ts",
-    "dev:app": "cd app && bunx vite",
     "dev": "bash scripts/dev.sh",
     "build": "bash scripts/build.sh",
     "test": "bun test core/tests",

@@ -3,6 +3,7 @@ import { logger as honoLogger } from "hono/logger";
 import { config } from "./config.ts";
 import { healthRoute } from "./routes/health.ts";
 import { generateRoute } from "./routes/generate.ts";
+import { debugRoute } from "./routes/debug.ts";
 import { corsMiddleware } from "./middlewares/cors.ts";
 import { rateLimit } from "./middlewares/rateLimit.ts";
 import { telegramAuth } from "./middlewares/telegramAuth.ts";
@@ -13,8 +14,6 @@ const app = new Hono();
 app.use("*", corsMiddleware);
 app.use("*", honoLogger());
 
-// Telegram auth применяется ко всем /api/* (кроме /api/health)
-// Если TELEGRAM_BOT_TOKEN не задан — пропускает без проверки (dev-режим)
 app.use("/api/generate", telegramAuth);
 app.use("/api/iterate", telegramAuth);
 
@@ -23,6 +22,7 @@ app.use("/api/iterate", rateLimit);
 
 app.route("/", healthRoute);
 app.route("/", generateRoute);
+app.route("/", debugRoute);
 
 app.get("/", (c) => {
   return c.json({
@@ -30,6 +30,7 @@ app.get("/", (c) => {
     version: "0.1.0",
     endpoints: [
       "GET  /api/health",
+      "GET  /api/debug",
       "POST /api/generate",
       "POST /api/iterate",
       "GET  /api/stats",
@@ -45,19 +46,11 @@ app.onError((err, c) => {
   return c.json({ error: "Internal server error", message: err.message }, 500);
 });
 
-// ─────────────────────────────────────────────────────────────
-// Railway / Production binding
-// ─────────────────────────────────────────────────────────────
-// Railway передаёт свой $PORT — обязательно слушаем 0.0.0.0,
-// иначе снаружи контейнера к серверу не достучаться.
-const port = Number(process.env.PORT ?? config.port ?? 3000);
-const hostname = "0.0.0.0";
-
-logger.info(`BGen server starting on http://${hostname}:${port}`);
+logger.info(`BGen server starting on http://${config.host}:${config.port}`);
 logger.info(`Telegram auth: ${config.telegramBotToken ? "ENABLED" : "disabled (dev mode)"}`);
 
 export default {
-  port,
-  hostname,
+  port: config.port,
+  hostname: config.host,
   fetch: app.fetch,
 };
