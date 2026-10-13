@@ -139,8 +139,8 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding-left: calc(0.6em + 6px);
-  padding-right: calc(0.6em + 6px);
+  padding-left: calc(1.8em + 6px);
+  padding-right: calc(1.8em + 6px);
   font-family: var(--font-mono);
   font-size: clamp(38px, 11vw, 56px);
   font-weight: 900;
