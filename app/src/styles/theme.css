@@ -1,7 +1,6 @@
 /* ============================================ */
 /* BGen — тема                                   */
 /* Шрифты: Inter (UI) + JetBrains Mono (лого)    */
-/* Fullscreen: html/body с position:fixed         */
 /* ============================================ */
 
 :root {
@@ -18,10 +17,6 @@
   --radius-lg: 20px;
   --gap: 12px;
 
-  /* Реальная высота viewport. Обновляется из JS через tg.viewportHeight. */
-  --tg-viewport-height: 100dvh;
-
-  /* Safe area — отступы под вырез/жесты iPhone и Android nav */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -34,28 +29,25 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
-}
-
-/* Ключевое: html и body прибиты к экрану через position: fixed; inset: 0.
-   Это работает и в браузере, и в TMA, и в embed. Внутренний скролл —
-   только внутри .app-root. */
-html, body {
   margin: 0;
   padding: 0;
+}
+
+/* Как в its_my_fairytale: height: 100%; overflow: hidden.
+   Без position: fixed, без inset: 0. Telegram сам управляет html/body. */
+html, body {
+  height: 100%;
+  overflow: hidden;
   background: #ffffff;
   color: var(--text);
   font-family: var(--font-ui);
   font-size: 16px;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  position: fixed;
-  inset: 0;
-  touch-action: manipulation;
+  line-height: 1.4;
+  user-select: none;
+  -webkit-user-select: none;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  -webkit-user-select: none;
-  user-select: none;
+  touch-action: manipulation;
 }
 
 body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
@@ -91,7 +83,6 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   padding: 24px;
 }
 
-/* Пиксельный шарик */
 .bee-ball {
   display: block;
   width: min(60vw, 280px);
@@ -100,7 +91,6 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   image-rendering: crisp-edges;
 }
 
-/* Обёртка для [BE......] + GEN — одной ширины */
 .bee-block {
   display: flex;
   flex-direction: column;
@@ -109,7 +99,6 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   gap: 10px;
 }
 
-/* Строка [BE......] */
 .bee-bar {
   display: flex;
   align-items: center;
@@ -141,9 +130,6 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 .bee-letters .bee-black  { color: #000000; }
 .bee-letters .bee-dot    { color: #cccccc; }
 
-/* GEN — три буквы растянуты по всей ширине между скобками.
-   padding-left/right компенсируют ширину скобок + gap от .bee-bar,
-   поэтому G встаёт под левой [, E по центру, N под правой ]. */
 .bee-gen {
   display: flex;
   justify-content: space-between;
@@ -176,12 +162,10 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 }
 
 /* ============================================ */
-/* ОСНОВНОЕ ПРИЛОЖЕНИЕ — на весь viewport        */
+/* ОСНОВНОЕ ПРИЛОЖЕНИЕ                           */
 /* ============================================ */
 
 .app-root {
-  max-width: 640px;
-  margin: 0 auto;
   width: 100%;
   height: 100%;
   overflow-y: auto;
@@ -193,6 +177,14 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   animation: app-fade-in 0.4s ease-out;
+}
+
+.app-root > * {
+  /* Ограничиваем ширину внутри */
+  max-width: 640px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 @keyframes app-fade-in {
@@ -322,7 +314,7 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
 .bgen-status.success {
   color: #060;
   background: #f0fff0;
-  border-left-color: #0a0;
+  border-left-color: #0a0a0;
 }
 
 .bgen-iteration {
@@ -347,7 +339,6 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   white-space: nowrap;
 }
 
-/* Превью игры. В браузере — 62vh, в TMA — 70% от реальной высоты viewport. */
 .bgen-frame {
   width: 100%;
   height: 62vh;
@@ -358,12 +349,12 @@ body.is-telegram ::-webkit-scrollbar { width: 0; height: 0; }
   display: block;
 }
 
+/* В TMA — игра выше */
 body.is-telegram .bgen-frame {
-  height: calc(var(--tg-viewport-height) * 0.7);
+  height: 62vh;
   min-height: 0;
 }
 
-/* Полноэкранный режим — игра на весь экран */
 .bgen-frame:fullscreen {
   height: 100vh;
   width: 100vw;
@@ -406,7 +397,4 @@ body.is-telegram .bgen-frame {
 
 @media (max-width: 480px) {
   .bgen-row { flex-direction: column; }
-  body.is-telegram .bgen-frame {
-    height: calc(var(--tg-viewport-height) * 0.66);
-  }
 }
