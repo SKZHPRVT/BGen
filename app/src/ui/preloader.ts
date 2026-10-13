@@ -2,20 +2,18 @@
  * Два прелоадера BGen.
  *
  * 1. runBootPreloader() — при открытии приложения.
- *    Показывает [BE......] + GEN + пиксельный шарик из хаоса.
- *    ~2.5 сек, потом fade-out и показывается экран start.
- *
- * 2. showLoadingPreloader() — при генерации игры.
- *    Показывает пиксельный шарик из хаоса + [BE......] внизу.
- *    Вызывается перед generate(). hideLoadingPreloader() — после.
+ * 2. showLoadingPreloader() — при генерации (с таймером, чтобы не выглядело как зависание).
  */
 
 const YELLOW = "#ffdd00";
 const BLACK = "#000000";
 
-// =============================================================
-// ПРЕЛОАДЕР 1 — СТАРТОВЫЙ (при открытии)
-// =============================================================
+let loadingTimerInterval: number | null = null;
+let loadingLettersInterval: number | null = null;
+
+// ═════════════════════════════════════════════════════════════
+// ПРЕЛОАДЕР 1 — СТАРТОВЫЙ
+// ═════════════════════════════════════════════════════════════
 
 export async function runBootPreloader(): Promise<void> {
   const preloaderEl = document.getElementById("preloader");
@@ -30,54 +28,39 @@ export async function runBootPreloader(): Promise<void> {
     return;
   }
 
-  // Шарик собирается из хаоса
   if (ballEl) assembleBall(ballEl);
 
-  // Анимация [BE......]
   lettersEl.innerHTML = renderLetters("BE······");
   await sleep(400);
 
   const steps = [
-    "BE·····E",
-    "BEE····E",
-    "BEEE···E",
-    "BEEEE··E",
-    "BEEEEE·E",
-    "BEEEEEE·",
-    "BEEEEEEE",
+    "BE·····E", "BEE····E", "BEEE···E", "BEEEE··E",
+    "BEEEEE·E", "BEEEEEE·", "BEEEEEEE",
   ];
   for (const s of steps) {
     lettersEl.innerHTML = renderLetters(s);
     await sleep(180);
   }
 
-  // Даём шарику дособраться
   await sleep(500);
 
-  // Показываем GEN
   genEl.innerHTML =
     '<span class="bee-gen-letter">G</span>' +
     '<span class="bee-gen-letter">E</span>' +
     '<span class="bee-gen-letter">N</span>';
   genEl.classList.add("show");
 
-  // Пауза на "полюбоваться"
   await sleep(900);
 
-  // Fade-out
   preloaderEl.classList.add("fade-out");
   await sleep(500);
   preloaderEl.remove();
-
-  // Показываем стартовый экран
   appEl.removeAttribute("hidden");
 }
 
-// =============================================================
+// ═════════════════════════════════════════════════════════════
 // ПРЕЛОАДЕР 2 — ГЕНЕРАЦИЯ
-// =============================================================
-
-let loadingLettersInterval: number | null = null;
+// ═════════════════════════════════════════════════════════════
 
 export function showLoadingPreloader(): void {
   const screenStart = document.getElementById("screen-start");
@@ -92,7 +75,9 @@ export function showLoadingPreloader(): void {
 
   const lettersEl = document.getElementById("loading-letters");
   const canvas = document.getElementById("chaos-canvas") as HTMLCanvasElement | null;
+  const hintEl = document.querySelector(".loading-hint") as HTMLElement | null;
 
+  // Анимация [BE......]
   if (lettersEl && loadingLettersInterval === null) {
     const SEQ = [
       "BE······", "BE·····E", "BEE····E", "BEEE···E",
@@ -106,6 +91,22 @@ export function showLoadingPreloader(): void {
     }, 220);
   }
 
+  // Таймер
+  if (hintEl) {
+    const start = Date.now();
+    if (loadingTimerInterval !== null) clearInterval(loadingTimerInterval);
+    hintEl.textContent = "Генерирую игру…";
+    loadingTimerInterval = window.setInterval(() => {
+      const sec = Math.floor((Date.now() - start) / 1000);
+      if (sec < 5) hintEl.textContent = "Генерирую игру…";
+      else if (sec < 30) hintEl.textContent = `Генерирую игру… ${sec} сек`;
+      else if (sec < 60) hintEl.textContent = `GigaChat думает… ${sec} сек`;
+      else if (sec < 90) hintEl.textContent = `Ещё немного… ${sec} сек`;
+      else hintEl.textContent = `Долго… ${sec} сек. Попробуйте другой промпт`;
+    }, 1000);
+  }
+
+  // Анимация хаоса
   if (canvas) {
     startChaosAnimation(canvas);
   }
@@ -119,13 +120,17 @@ export function hideLoadingPreloader(): void {
     clearInterval(loadingLettersInterval);
     loadingLettersInterval = null;
   }
+  if (loadingTimerInterval !== null) {
+    clearInterval(loadingTimerInterval);
+    loadingTimerInterval = null;
+  }
 
   screenLoading.setAttribute("hidden", "");
 }
 
-// =============================================================
-// Внутренние утилиты
-// =============================================================
+// ═════════════════════════════════════════════════════════════
+// Утилиты
+// ═════════════════════════════════════════════════════════════
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
@@ -148,9 +153,9 @@ function renderLetters(text: string): string {
     .join("");
 }
 
-// =============================================================
-// ПРЕЛОАДЕР 1 — шарик собирается из хаоса в .bee-ball (canvas 480x480)
-// =============================================================
+// ═════════════════════════════════════════════════════════════
+// Пиксельный шарик (для boot)
+// ═════════════════════════════════════════════════════════════
 
 interface Pixel1 {
   sx: number; sy: number;
@@ -235,9 +240,9 @@ function assembleBall(canvas: HTMLCanvasElement): void {
   requestAnimationFrame(frame);
 }
 
-// =============================================================
-// ПРЕЛОАДЕР 2 — шарик собирается из хаоса на canvas #chaos-canvas
-// =============================================================
+// ═════════════════════════════════════════════════════════════
+// Chaos-анимация (для loading)
+// ═════════════════════════════════════════════════════════════
 
 interface ChaosPixel {
   sx: number; sy: number;
@@ -262,17 +267,14 @@ function startChaosAnimation(canvas: HTMLCanvasElement): void {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
   resize();
-  window.addEventListener("resize", resize);
 
   const particles: ChaosPixel[] = [];
 
   function buildPixels(): void {
     particles.length = 0;
-
     const W = canvas.clientWidth;
     const H = canvas.clientHeight;
     const CX = W / 2;
-    // Шарик чуть выше середины, чтобы [BE......] внизу не перекрывал
     const CY = H * 0.42;
     const R = Math.min(W, H) * 0.28;
     const PIXEL = 4;
@@ -309,7 +311,7 @@ function startChaosAnimation(canvas: HTMLCanvasElement): void {
   }
 
   buildPixels();
-  window.addEventListener("resize", buildPixels);
+  window.addEventListener("resize", () => { resize(); buildPixels(); });
 
   const startTs = performance.now();
 

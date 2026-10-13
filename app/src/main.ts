@@ -3,23 +3,18 @@ import { initPlatform, haptic } from "./tg.ts";
 import { platform } from "./platform.ts";
 import { generate, iterate, ApiError } from "./api.ts";
 import { store, type GameRecord } from "./state/store.ts";
-import { runBootPreloader, showLoadingPreloader, hideLoadingPreloader } from "./ui/preloader.ts";
+import {
+  runBootPreloader,
+  showLoadingPreloader,
+  hideLoadingPreloader,
+} from "./ui/preloader.ts";
 import { mountSettings, type SettingsElements } from "./ui/settingsModal.ts";
 import { shareGame } from "./ui/share.ts";
 import { exportGame } from "./ui/export.ts";
-import {
-  mountGameControls,
-  setGameFrame,
-  pickControlsMode,
-  sendGameInput,
-  type GameControlsElements,
-} from "./ui/gameControls.ts";
+
+console.log("[BGen] main.ts loading...");
 
 initPlatform();
-
-// =============================================================
-// DOM
-// =============================================================
 
 const screenStart = document.getElementById("screen-start")!;
 const screenGame = document.getElementById("screen-game")!;
@@ -38,14 +33,19 @@ const gamesClose = document.getElementById("gamesClose") as HTMLButtonElement;
 const gamesNewBtn = document.getElementById("gamesNewBtn") as HTMLButtonElement;
 const gamesBackdrop = gamesModal.querySelector(".modal-backdrop") as HTMLDivElement;
 
-// =============================================================
-// Инициализация
-// =============================================================
+console.log("[BGen] DOM mounted");
 
-setGameFrame(gameFrame);
+function showScreen(name: "start" | "game"): void {
+  if (name === "start") {
+    screenStart.removeAttribute("hidden");
+    screenGame.setAttribute("hidden", "");
+  } else {
+    screenStart.setAttribute("hidden", "");
+    screenGame.removeAttribute("hidden");
+  }
+}
 
 let settingsEl: SettingsElements | null = null;
-let controlsEl: GameControlsElements | null = null;
 let lastGame: GameRecord | null = null;
 
 function buildSettings(): void {
@@ -59,36 +59,10 @@ function buildSettings(): void {
   });
 }
 
-function buildControls(): void {
-  controlsEl = mountGameControls({
-    onRestart: () => onRestart(),
-  });
-}
-
 settingsBtn.addEventListener("click", () => {
   haptic("light");
   settingsEl?.open();
 });
-
-// =============================================================
-// Экраны
-// =============================================================
-
-function showScreen(name: "start" | "game"): void {
-  if (name === "start") {
-    screenStart.removeAttribute("hidden");
-    screenGame.setAttribute("hidden", "");
-    controlsEl?.hide();
-  } else {
-    screenStart.setAttribute("hidden", "");
-    screenGame.removeAttribute("hidden");
-    controlsEl?.show();
-  }
-}
-
-// =============================================================
-// Старт
-// =============================================================
 
 function getSelectedAudience(): string {
   const checked = document.querySelector('input[name="audience"]:checked') as HTMLInputElement | null;
@@ -105,12 +79,20 @@ startBtn.addEventListener("click", async () => {
 
   haptic("medium");
   hideStartStatus();
+  console.log("[BGen] Generation started:", prompt);
   showLoadingPreloader();
 
   try {
     const res = await generate({
       prompt,
       audience: getSelectedAudience(),
+    });
+
+    console.log("[BGen] Generation response:", {
+      provider: res.provider,
+      attempts: res.attempts,
+      ok: res.ok,
+      htmlLen: res.html?.length,
     });
 
     const game: GameRecord = {
@@ -127,25 +109,22 @@ startBtn.addEventListener("click", async () => {
     await store.addGame(game);
     lastGame = game;
     renderGame(game);
+    console.log("[BGen] Game rendered, srcdoc length:", gameFrame.srcdoc.length);
 
-    await sleep(600);
-    hideLoadingPreloader();
+    await sleep(400);
+    try { hideLoadingPreloader(); } catch (e) { console.error("hide err", e); }
     showScreen("game");
-
-    // Настроить режим управления по жанру
-    controlsEl?.setMode(pickControlsMode(game.genre));
+    console.log("[BGen] Screen switched to game");
 
     if (settingsEl) {
       settingsEl.setMeta(`${game.genre} · ${game.audience} · ${game.provider}`);
     }
 
-    // Через 500мс отправить 'start' — на случай если игра ждёт команды
-    setTimeout(() => sendGameInput("start"), 500);
-
     haptic("success");
   } catch (e) {
+    console.error("[BGen] Generation failed:", e);
     haptic("error");
-    hideLoadingPreloader();
+    try { hideLoadingPreloader(); } catch (e2) { console.error("hide err", e2); }
     showScreen("start");
     const msg = e instanceof ApiError ? e.message : (e as Error).message;
     showStartStatus(`Ошибка: ${msg}`, "error");
@@ -168,10 +147,6 @@ function showStartStatus(text: string, type: "info" | "error"): void {
 function hideStartStatus(): void {
   startStatus.setAttribute("hidden", "");
 }
-
-// =============================================================
-// Список игр
-// =============================================================
 
 allGamesBtn.addEventListener("click", () => {
   haptic("light");
@@ -227,12 +202,10 @@ function renderGamesList(): void {
       lastGame = rec;
       renderGame(rec);
       showScreen("game");
-      controlsEl?.setMode(pickControlsMode(rec.genre));
       haptic("light");
       if (settingsEl) {
         settingsEl.setMeta(`${rec.genre} · ${rec.audience} · ${rec.provider}`);
       }
-      setTimeout(() => sendGameInput("start"), 500);
     });
 
     gamesList.appendChild(card);
@@ -247,10 +220,6 @@ function genreEmoji(genre: string): string {
   };
   return map[genre] ?? "🎮";
 }
-
-// =============================================================
-// Действия
-// =============================================================
 
 async function onIterate(newPrompt: string): Promise<void> {
   if (!lastGame) return;
@@ -281,20 +250,18 @@ async function onIterate(newPrompt: string): Promise<void> {
     lastGame = game;
     renderGame(game);
 
-    await sleep(500);
-    hideLoadingPreloader();
+    await sleep(400);
+    try { hideLoadingPreloader(); } catch {}
     showScreen("game");
-    controlsEl?.setMode(pickControlsMode(game.genre));
 
     if (settingsEl) {
       settingsEl.setMeta(`${game.genre} · ${game.audience} · ${game.provider} · доработано`);
     }
 
-    setTimeout(() => sendGameInput("start"), 500);
     haptic("success");
   } catch (e) {
     haptic("error");
-    hideLoadingPreloader();
+    try { hideLoadingPreloader(); } catch {}
     showScreen("game");
     console.warn("[iterate] failed", e);
   }
@@ -318,7 +285,11 @@ async function onShare(): Promise<void> {
 
 function onRestart(): void {
   if (!lastGame) return;
-  sendGameInput("restart");
+  const html = lastGame.html;
+  gameFrame.srcdoc = "";
+  requestAnimationFrame(() => {
+    gameFrame.srcdoc = html;
+  });
   haptic("light");
 }
 
@@ -337,16 +308,9 @@ function onNewGame(): void {
   haptic("light");
 }
 
-// =============================================================
-// Рендер игры
-// =============================================================
-
 function renderGame(game: GameRecord): void {
   gameFrame.srcdoc = game.html;
   updateGamesCount();
-
-  // Через 300мс отправим команду start — на случай если игра ждёт
-  setTimeout(() => sendGameInput("start"), 300);
 }
 
 function updateGamesCount(): void {
@@ -354,10 +318,6 @@ function updateGamesCount(): void {
   gamesCount.textContent = String(n);
   gamesCount.style.display = n > 0 ? "" : "none";
 }
-
-// =============================================================
-// Утилиты
-// =============================================================
 
 function makeId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -367,20 +327,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-// =============================================================
-// Store
-// =============================================================
-
 store.subscribe(() => {
   updateGamesCount();
 });
 
-// =============================================================
-// Boot
-// =============================================================
-
 buildSettings();
-buildControls();
 
 (async () => {
   await store.load();
