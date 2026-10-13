@@ -1,11 +1,3 @@
-/**
- * Простейшее observable-хранилище.
- *
- * ВАЖНО: addGame обновляет state СИНХРОННО, а сохранение в storage
- * делает в фоне (fire-and-forget). Это не блокирует UI в TMA,
- * где CloudStorage может тормозить.
- */
-
 import { storage } from "./storage.ts";
 
 export interface GameRecord {
@@ -74,28 +66,29 @@ class Store {
   }
 
   /**
-   * СИНХРОННО обновляет state и возвращает управление.
-   * Сохранение в storage — в фоне. UI не блокируется.
+   * ВАЖНО: этот метод НЕ асинхронный для UI.
+   * Он мгновенно обновляет state и emit'ит.
+   * Сохранение в storage идёт В ФОНЕ через fire-and-forget.
    */
-  async addGame(rec: GameRecord): Promise<void> {
+  addGame(rec: GameRecord): void {
     this.state.history = [rec, ...this.state.history].slice(0, MAX_HISTORY);
     this.state.currentGame = rec;
     this.emit();
 
-    // Fire-and-forget — не блокируем клиента
-    this.persistBackground();
+    // Persist в фоне — не блокирует UI
+    this.persistInBackground();
   }
 
-  async removeGame(id: string): Promise<void> {
+  removeGame(id: string): void {
     this.state.history = this.state.history.filter((g) => g.id !== id);
     this.emit();
-    this.persistBackground();
+    this.persistInBackground();
   }
 
-  async clearHistory(): Promise<void> {
+  clearHistory(): void {
     this.state.history = [];
     this.emit();
-    this.persistBackground();
+    this.persistInBackground();
   }
 
   private emit(): void {
@@ -103,11 +96,10 @@ class Store {
   }
 
   /**
-   * Сохранение в фоне. Не блокирует UI.
+   * Fire-and-forget сохранение. Не ждём, не блокируем.
    */
-  private persistBackground(): void {
+  private persistInBackground(): void {
     const data = JSON.stringify(this.state.history);
-    // Не await — просто запускаем и забываем
     storage.set(STORAGE_KEY, data).catch((e) => {
       console.warn("[store] persist failed", e);
     });

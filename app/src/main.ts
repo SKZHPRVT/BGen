@@ -16,10 +16,6 @@ console.log("[BGen] main.ts loading...");
 
 initPlatform();
 
-// ═════════════════════════════════════════════════════════════
-// DOM
-// ═════════════════════════════════════════════════════════════
-
 const screenStart = document.getElementById("screen-start")!;
 const screenGame = document.getElementById("screen-game")!;
 const gameFrame = document.getElementById("gameFrame") as HTMLIFrameElement;
@@ -39,10 +35,6 @@ const gamesBackdrop = gamesModal.querySelector(".modal-backdrop") as HTMLDivElem
 
 console.log("[BGen] DOM mounted");
 
-// ═════════════════════════════════════════════════════════════
-// Экраны
-// ═════════════════════════════════════════════════════════════
-
 function showScreen(name: "start" | "game"): void {
   if (name === "start") {
     screenStart.removeAttribute("hidden");
@@ -52,10 +44,6 @@ function showScreen(name: "start" | "game"): void {
     screenGame.removeAttribute("hidden");
   }
 }
-
-// ═════════════════════════════════════════════════════════════
-// Модал настроек
-// ═════════════════════════════════════════════════════════════
 
 let settingsEl: SettingsElements | null = null;
 let lastGame: GameRecord | null = null;
@@ -75,10 +63,6 @@ settingsBtn.addEventListener("click", () => {
   haptic("light");
   settingsEl?.open();
 });
-
-// ═════════════════════════════════════════════════════════════
-// Стартовый экран — СТАРТ
-// ═════════════════════════════════════════════════════════════
 
 function getSelectedAudience(): string {
   const checked = document.querySelector('input[name="audience"]:checked') as HTMLInputElement | null;
@@ -104,7 +88,7 @@ startBtn.addEventListener("click", async () => {
       audience: getSelectedAudience(),
     });
 
-    console.log("[BGen] Generation response:", {
+    console.log("[BGen] Response received:", {
       provider: res.provider,
       attempts: res.attempts,
       ok: res.ok,
@@ -122,31 +106,40 @@ startBtn.addEventListener("click", async () => {
       provider: res.provider,
     };
 
+    // ⚡ КРИТИЧНО: сначала РЕНДЕРИМ игру и показываем экран,
+    // потом сохраняем в фоне. Store.addGame теперь синхронный.
     lastGame = game;
-
-    // ═══════════════════════════════════════════════════════════
-    // КРИТИЧНО: показываем игру СРАЗУ, не ждём сохранения
-    // ═══════════════════════════════════════════════════════════
     renderGame(game);
     console.log("[BGen] Game rendered, srcdoc length:", gameFrame.srcdoc.length);
 
-    // Скрываем прелоадер и переключаем экран
-    try { hideLoadingPreloader(); } catch (e) { console.error("hide err", e); }
+    // Синхронный addGame — обновляет state мгновенно, persist в фоне
+    try {
+      store.addGame(game);
+    } catch (e) {
+      console.warn("[BGen] store.addGame failed (не критично):", e);
+    }
+
+    // Показываем экран игры
     showScreen("game");
     console.log("[BGen] Screen switched to game");
+
+    // Скрываем прелоадер (минимум 2.5 сек суммарно)
+    try {
+      await hideLoadingPreloader();
+      console.log("[BGen] Preloader hidden");
+    } catch (e) {
+      console.warn("[BGen] hideLoadingPreloader error:", e);
+    }
 
     if (settingsEl) {
       settingsEl.setMeta(`${game.genre} · ${game.audience} · ${game.provider}`);
     }
 
     haptic("success");
-
-    // Сохранение в истории — в фоне, НЕ блокирует UI
-    store.addGame(game).catch((e) => console.warn("[BGen] save failed:", e));
   } catch (e) {
     console.error("[BGen] Generation failed:", e);
     haptic("error");
-    try { hideLoadingPreloader(); } catch (e2) { console.error("hide err", e2); }
+    try { await hideLoadingPreloader(); } catch {}
     showScreen("start");
     const msg = e instanceof ApiError ? e.message : (e as Error).message;
     showStartStatus(`Ошибка: ${msg}`, "error");
@@ -169,10 +162,6 @@ function showStartStatus(text: string, type: "info" | "error"): void {
 function hideStartStatus(): void {
   startStatus.setAttribute("hidden", "");
 }
-
-// ═════════════════════════════════════════════════════════════
-// Модал «Все мои игры»
-// ═════════════════════════════════════════════════════════════
 
 allGamesBtn.addEventListener("click", () => {
   haptic("light");
@@ -247,10 +236,6 @@ function genreEmoji(genre: string): string {
   return map[genre] ?? "🎮";
 }
 
-// ═════════════════════════════════════════════════════════════
-// Действия из модала настроек
-// ═════════════════════════════════════════════════════════════
-
 async function onIterate(newPrompt: string): Promise<void> {
   if (!lastGame) return;
 
@@ -277,22 +262,20 @@ async function onIterate(newPrompt: string): Promise<void> {
     };
 
     lastGame = game;
-
-    // Также показываем СРАЗУ
     renderGame(game);
-    try { hideLoadingPreloader(); } catch {}
+    try { store.addGame(game); } catch (e) { console.warn("save failed", e); }
+
     showScreen("game");
+    try { await hideLoadingPreloader(); } catch {}
 
     if (settingsEl) {
       settingsEl.setMeta(`${game.genre} · ${game.audience} · ${game.provider} · доработано`);
     }
 
     haptic("success");
-
-    store.addGame(game).catch((e) => console.warn("[BGen] save failed:", e));
   } catch (e) {
     haptic("error");
-    try { hideLoadingPreloader(); } catch {}
+    try { await hideLoadingPreloader(); } catch {}
     showScreen("game");
     console.warn("[iterate] failed", e);
   }
@@ -339,10 +322,6 @@ function onNewGame(): void {
   haptic("light");
 }
 
-// ═════════════════════════════════════════════════════════════
-// Рендер игры
-// ═════════════════════════════════════════════════════════════
-
 function renderGame(game: GameRecord): void {
   gameFrame.srcdoc = game.html;
   updateGamesCount();
@@ -354,25 +333,13 @@ function updateGamesCount(): void {
   gamesCount.style.display = n > 0 ? "" : "none";
 }
 
-// ═════════════════════════════════════════════════════════════
-// Утилиты
-// ═════════════════════════════════════════════════════════════
-
 function makeId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// ═════════════════════════════════════════════════════════════
-// Store subscribe
-// ═════════════════════════════════════════════════════════════
-
 store.subscribe(() => {
   updateGamesCount();
 });
-
-// ═════════════════════════════════════════════════════════════
-// Boot
-// ═════════════════════════════════════════════════════════════
 
 buildSettings();
 

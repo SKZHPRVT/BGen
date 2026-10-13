@@ -2,7 +2,7 @@
  * Два прелоадера BGen.
  *
  * 1. runBootPreloader() — при открытии приложения.
- * 2. showLoadingPreloader() — при генерации (с таймером, чтобы не выглядело как зависание).
+ * 2. showLoadingPreloader() — при генерации (минимум 2.5 секунды, чтобы увидели).
  */
 
 const YELLOW = "#ffdd00";
@@ -10,6 +10,10 @@ const BLACK = "#000000";
 
 let loadingTimerInterval: number | null = null;
 let loadingLettersInterval: number | null = null;
+let loadingShownAt = 0;
+
+// Минимальное время показа прелоадера генерации (мс)
+const MIN_LOADING_MS = 2500;
 
 // ═════════════════════════════════════════════════════════════
 // ПРЕЛОАДЕР 1 — СТАРТОВЫЙ
@@ -69,6 +73,8 @@ export function showLoadingPreloader(): void {
 
   if (!screenLoading) return;
 
+  loadingShownAt = Date.now();
+
   screenStart?.setAttribute("hidden", "");
   screenGame?.setAttribute("hidden", "");
   screenLoading.removeAttribute("hidden");
@@ -112,7 +118,21 @@ export function showLoadingPreloader(): void {
   }
 }
 
-export function hideLoadingPreloader(): void {
+/**
+ * Скрывает прелоадер генерации.
+ * НЕ мгновенно — ждёт, чтобы прелоадер был виден минимум MIN_LOADING_MS.
+ */
+export async function hideLoadingPreloader(): Promise<void> {
+  const elapsed = Date.now() - loadingShownAt;
+
+  // Если прелоадер не был показан — ничего не делаем
+  if (loadingShownAt === 0) return;
+
+  // Если показан меньше MIN_LOADING_MS — подожди до минимума
+  if (elapsed < MIN_LOADING_MS) {
+    await sleep(MIN_LOADING_MS - elapsed);
+  }
+
   const screenLoading = document.getElementById("screen-loading");
   if (!screenLoading) return;
 
@@ -126,6 +146,7 @@ export function hideLoadingPreloader(): void {
   }
 
   screenLoading.setAttribute("hidden", "");
+  loadingShownAt = 0;
 }
 
 // ═════════════════════════════════════════════════════════════
