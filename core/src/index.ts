@@ -3,9 +3,12 @@
  *
  * Логика:
  *   1. classify → GameSpec
- *   2. Если жанр поддерживается движком → LLM даёт JSON-конфиг → движок строит HTML
- *      При любой ошибке — используем defaultConfig, никогда не уходим на старый pipeline
- *   3. Если жанр не поддерживается → старый pipeline (LLM пишет HTML)
+ *   2. Если жанр поддерживается движком:
+ *      - LLM даёт key:value конфиг (или JSON)
+ *      - Парсер извлекает параметры (3 стратегии)
+ *      - Движок строит HTML
+ *      - При любой ошибке — defaultConfig, никогда не уходим на старый pipeline
+ *   3. Неизвестный жанр → старый pipeline (LLM пишет HTML)
  */
 import type {
   GenerateOptions,
@@ -28,6 +31,7 @@ import { logger } from "./telemetry/logger.ts";
 import { isSupported, buildGame } from "./engine/build.ts";
 import { buildConfigPrompt } from "./engine/prompts.ts";
 import { normalizeConfig, defaultConfig } from "./engine/types.ts";
+import { parseLLMResponse } from "./engine/parseConfig.ts";
 
 export interface GeneratorOptions {
   router?: Router;
@@ -58,10 +62,6 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
   const cache = options.cache ?? new SemanticCache();
   const corpusDir = options.corpusDir ?? "core/corpus";
 
-  // ───────────────────────────────────────────────────────────
-  // Engine-путь: LLM → JSON → движок → HTML
-  // Гарантия: никогда не падает, всегда возвращает HTML
-  // ───────────────────────────────────────────────────────────
   async function generateViaEngine(
     userInput: UserInput,
     spec: GameSpec,
@@ -72,8 +72,9 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
 
     let rawConfig: any = null;
     let providerName = "engine-default";
+    let parseStrategy = "none";
 
-    // Шаг 1. Пытаемся получить JSON-конфиг от LLM
+    // Шаг 1. Получаем конфиг от LLM
     try {
       const { system, user } = buildConfigPrompt(
         spec.genre,
@@ -84,7 +85,7 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
       const res = await router.generate({
         system,
         user,
-        maxTokens: 2000,
+        maxTokens: 1500,
         temperature: 0.7,
       });
       providerName = res.provider;
@@ -92,57 +93,29 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
       logger.info("Engine LLM raw response", {
         provider: res.provider,
         length: res.text.length,
-        preview: res.text.slice(0, 200),
+        preview: res.text.slice(0, 300).replace(/\n/g, "\\n"),
       });
 
-      // Парсим JSON
-      let cleaned = res.text.trim();
-      cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, "");
-      cleaned = cleaned.replace(/\n?```\s*$/i, "");
+      // Умный парсер — JSON / key:value / ничего
+      const parsed = parseLLMResponse(res.text, spec.genre);
+      parseStrategy = parsed.strategy;
 
-      // Отклоняем ответы с HTML — это явно не JSON-конфиг
-      if (
-        cleaned.includes("<!DOCTYPE") ||
-        cleaned.includes("<html") ||
-        cleaned.includes("<script")
-      ) {
-        logger.warn("LLM returned HTML instead of JSON, using default config");
+      if (parsed.config) {
+        rawConfig = parsed.config;
+        logger.info("Parsed config", {
+          strategy: parsed.strategy,
+          keys: Object.keys(rawConfig).slice(0, 10),
+        });
       } else {
-        const js = cleaned.indexOf("{");
-        const je = cleaned.lastIndexOf("}");
-        if (js !== -1 && je !== -1) {
-          try {
-            const parsed = JSON.parse(cleaned.slice(js, je + 1));
-            // Проверяем, что это похоже на конфиг игры
-            if (
-              parsed &&
-              typeof parsed === "object" &&
-              (parsed.title || parsed.colors || parsed.speed || parsed.sprites)
-            ) {
-              rawConfig = parsed;
-              logger.info("Parsed JSON config successfully");
-            } else {
-              logger.warn("Parsed JSON is not a game config", {
-                keys: Object.keys(parsed || {}).slice(0, 10),
-              });
-            }
-          } catch (parseErr) {
-            logger.warn("JSON parse failed", {
-              error: (parseErr as Error).message,
-              preview: cleaned.slice(0, 200),
-            });
-          }
-        } else {
-          logger.warn("No JSON object found in LLM response");
-        }
+        logger.warn("Parse failed — using default config");
       }
     } catch (e) {
-      logger.warn("Engine LLM config failed, using default", {
+      logger.warn("Engine LLM request failed, using default", {
         error: (e as Error).message,
       });
     }
 
-    // Шаг 2. Собираем HTML. Пробуем с LLM-конфигом, при неудаче — дефолт
+    // Шаг 2. Собираем HTML
     let html = "";
     let usedDefault = false;
 
@@ -165,13 +138,12 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         logger.error("Even default build failed", {
           error: (defErr as Error).message,
         });
-        // Совсем критичный случай — отдаём минимальный HTML
-        html = `<!DOCTYPE html><html><body style="background:#111;color:#fff;font-family:sans-serif;padding:40px;text-align:center"><h1>Упс</h1><p>Не удалось собрать игру</p></body></html>`;
+        html = `<!DOCTYPE html><html><body style="background:#111;color:#fff;font-family:sans-serif;padding:40px;text-align:center"><h1>Ошибка</h1><p>Не удалось собрать игру</p></body></html>`;
         usedDefault = true;
       }
     }
 
-    // Шаг 3. Анализ (быстрый — движок гарантирует структуру)
+    // Шаг 3. Анализ
     let report;
     try {
       report = analyze(html, { html });
@@ -190,16 +162,23 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
     logger.info("Engine generation done", {
       genre: spec.genre,
       provider: providerName,
+      parseStrategy,
       ok: report.ok,
       usedDefault,
       durationMs,
     });
 
+    const providerLabel = usedDefault
+      ? "engine+default"
+      : rawConfig
+        ? `engine+${providerName}+${parseStrategy}`
+        : "engine+default";
+
     return {
       html,
       spec,
       attempts: 1,
-      provider: usedDefault ? "engine+default" : `engine+${providerName}`,
+      provider: providerLabel,
       warnings: report.warnings.map((w) => `${w.id}: ${w.message}`),
       repairedErrors: [],
       fromCache: false,
@@ -242,12 +221,12 @@ export function createGenerator(options: GeneratorOptions = {}): BGenGenerator {
         globalMetrics.recordCacheMiss();
       }
 
-      // 2. Движок (для поддерживаемых жанров) — гарантированно возвращает HTML
+      // 2. Движок
       if (isSupported(spec.genre)) {
         return generateViaEngine(userInput, spec, opts, start);
       }
 
-      // 3. Старый pipeline (для остальных жанров)
+      // 3. Старый pipeline для остальных жанров
       let examples: string[] = [];
       if (opts.useCorpus !== false) {
         const corpus: CorpusEntry[] = await loadCorpus(corpusDir);
