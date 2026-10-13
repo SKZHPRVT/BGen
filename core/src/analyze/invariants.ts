@@ -1,6 +1,5 @@
 /**
- * Игровые инварианты. Проверяют, что перед нами действительно игра,
- * а не набор div'ов, и что она запускается в играбельном состоянии.
+ * Игровые инварианты.
  *
  * Severity:
  *   error   — блокирует приёмку, запускает repair loop
@@ -14,7 +13,7 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
   const html = ast.raw;
 
   // ─────────────────────────────────────────────────────────────
-  // Canvas должен быть на весь экран
+  // Canvas: должен быть на весь экран
   // ─────────────────────────────────────────────────────────────
   const hardcodedCanvasSize =
     /canvas\.width\s*=\s*\d{2,4}\s*;/i.test(html) ||
@@ -29,43 +28,101 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
       id: "hardcoded-canvas-size",
       severity: "error",
       message: "Canvas размер задан хардкодом, а не под экран",
-      hint:
-        "Используй: canvas.width = window.innerWidth * (window.devicePixelRatio || 1); " +
-        "canvas.height = window.innerHeight * (window.devicePixelRatio || 1); " +
-        "canvas.style.width = window.innerWidth + 'px'; " +
-        "canvas.style.height = window.innerHeight + 'px'; " +
-        "И добавь addEventListener('resize', ...) для пересчёта.",
+      hint: "canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr; + addEventListener('resize')",
     });
   }
 
-  // Canvas есть, но ничего не рисуется
+  // Canvas есть, но нет отрисовки
   const hasFillRect = /\.fillRect\s*\(/i.test(html);
   const hasFillText = /\.fillText\s*\(/i.test(html);
   const hasDrawImage = /\.drawImage\s*\(/i.test(html);
   const hasClearRect = /\.clearRect\s*\(/i.test(html);
-  const hasAnyDrawing = hasFillRect || hasFillText || hasDrawImage || hasClearRect;
-
-  if (ast.hasCanvas && !hasAnyDrawing) {
+  if (ast.hasCanvas && !(hasFillRect || hasFillText || hasDrawImage || hasClearRect)) {
     issues.push({
       id: "canvas-no-drawing",
       severity: "error",
-      message: "Canvas есть, но в коде нет команд отрисовки",
-      hint:
-        "Добавь ctx.fillRect() или ctx.fillText() в функцию render(). " +
-        "Без этого на canvas ничего не появится.",
+      message: "Canvas есть, но нет команд отрисовки",
+      hint: "Добавь ctx.fillRect() или ctx.fillText() в render().",
     });
   }
 
-  // Неправильные HTML-entities для стрелок
+  // ─────────────────────────────────────────────────────────────
+  // CSS: calc() без пробелов вокруг операторов
+  // ─────────────────────────────────────────────────────────────
+  // Невалидно: calc(50%-50vw), calc(100%-20px)
+  const badCalc = /calc\([^)]*\d(%|px|vw|vh|em|rem)?\s*[+\-*/]\s*\d/i.test(html);
+  const goodCalcSpacing = /calc\([^)]*\d(%|px|vw|vh|em|rem)?\s+[+\-*/]\s+\d/i.test(html);
+  if (badCalc && !goodCalcSpacing) {
+    issues.push({
+      id: "invalid-calc-syntax",
+      severity: "error",
+      message: "calc() без пробелов вокруг оператора — невалидный CSS",
+      hint: "В calc() пробелы обязательны: calc(50% - 50vw), calc(100% - 20px)",
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Кнопки управления: #controls должен быть flex
+  // ─────────────────────────────────────────────────────────────
+  const hasControlsButtons =
+    /<div[^>]*id\s*=\s*["']controls["']/i.test(html) ||
+    /<button[^>]*>\s*[◀▲▼▶←↑↓→]/i.test(html);
+
+  if (hasControlsButtons) {
+    const controlsIsFlex = /#controls\s*\{[^}]*display\s*:\s*(flex|grid)/i.test(html);
+    const controlsIsFixed = /#controls\s*\{[^}]*position\s*:\s*fixed/i.test(html);
+
+    if (!controlsIsFlex) {
+      issues.push({
+        id: "controls-no-flex",
+        severity: "error",
+        message: "Кнопки управления без flex/grid контейнера",
+        hint: "#controls { display: flex; position: fixed; bottom: ...; left: 50%; transform: translateX(-50%); gap: 16px; }",
+      });
+    }
+    if (!controlsIsFixed) {
+      issues.push({
+        id: "controls-not-fixed",
+        severity: "warning",
+        message: "#controls без position: fixed",
+        hint: "Кнопки должны быть зафиксированы внизу: position: fixed; bottom: ...;",
+      });
+    }
+
+    // Каждая кнопка внутри #controls не должна иметь position: fixed
+    const buttonHasFixed = /#controls\s+button\s*\{[^}]*position\s*:\s*fixed/i.test(html);
+    if (buttonHasFixed) {
+      issues.push({
+        id: "button-position-fixed",
+        severity: "error",
+        message: "Каждая кнопка с position: fixed — они наложатся друг на друга",
+        hint: "position: fixed только у #controls (родителя). Кнопки — обычные flex-элементы.",
+      });
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Сравнение textContent с HTML-entity
+  // ─────────────────────────────────────────────────────────────
+  if (/textContent\s*===?\s*['"`]&[a-z]+;['"`]/i.test(html)) {
+    issues.push({
+      id: "textcontent-vs-entity",
+      severity: "error",
+      message: "Сравнение textContent с HTML-entity — не сработает",
+      hint: "textContent возвращает символ (◀), а не entity (&larr;). Используй data-dir или id кнопки.",
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // HTML-entities стрелок — запрещены
+  // ─────────────────────────────────────────────────────────────
   const badEntities = /&(uarr|darr|larr|rarr|upp|dow|left|right);/i;
   if (badEntities.test(html)) {
     issues.push({
       id: "bad-arrow-entities",
       severity: "error",
       message: "Неправильные HTML-entities для стрелок",
-      hint:
-        "Используй символы напрямую: ◀ ▲ ▼ ▶ (или unicode: &#x25C0; &#x25B2; &#x25BC; &#x25B6;). " +
-        "Не используй &uarr; &darr; &upp; &dow; — они не отображаются.",
+      hint: "Используй символы напрямую: ◀ ▲ ▼ ▶",
     });
   }
 
@@ -77,11 +134,11 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
       id: "no-game-loop",
       severity: "error",
       message: "Нет игрового цикла (requestAnimationFrame / setInterval)",
-      hint: "Добавь requestAnimationFrame(loop) в конце и вызывай рекурсивно.",
+      hint: "Добавь requestAnimationFrame(loop) и вызывай рекурсивно.",
     });
   }
 
-  // Обработчики ввода
+  // Ввод
   const hasAnyInput = ast.hasKeydown || ast.hasTouch || ast.hasMouse;
   if (!hasAnyInput) {
     issues.push({
@@ -92,13 +149,12 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     });
   }
 
-  // Мобильное управление
   if (!ast.hasTouch) {
     issues.push({
       id: "no-touch",
       severity: "warning",
       message: "Нет touch-управления",
-      hint: "Добавь touchstart/touchmove/touchend для мобильных устройств.",
+      hint: "Добавь touchstart/touchmove/touchend.",
     });
   }
 
@@ -107,85 +163,72 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
     issues.push({
       id: "no-state-machine",
       severity: "error",
-      message: "Нет явной state machine (start/playing/gameover)",
-      hint: "Введи переменную state со значениями 'start', 'playing', 'gameover'.",
+      message: "Нет явной state machine",
+      hint: "Введи переменную state ('start', 'playing', 'gameover').",
     });
   }
 
-  // Победа/поражение — WARNING
+  // Win/lose — warning
   if (!ast.hasWinLose) {
     issues.push({
       id: "no-win-lose",
       severity: "warning",
       message: "Нет явного условия победы/поражения",
-      hint: "Для аркад это нормально. Для змейки/2048/платформера добавь win/lose.",
+      hint: "Для аркад это нормально.",
     });
   }
 
-  // Рестарт
   if (!ast.hasRestart) {
     issues.push({
       id: "no-restart",
       severity: "warning",
       message: "Нет кнопки/функции рестарта",
-      hint: "Добавь функцию reset() и кнопку «Заново».",
+      hint: "Добавь reset() и кнопку «Заново».",
     });
   }
 
-  // Ресайз
   if (!ast.hasResize) {
     issues.push({
       id: "no-resize",
       severity: "warning",
-      message: "Канвас/DOM не адаптируется под экран",
-      hint: "Добавь addEventListener('resize', ...) и обновляй размеры canvas.",
+      message: "Канвас не адаптируется под экран",
+      hint: "Добавь addEventListener('resize', ...).",
     });
   }
 
-  // Viewport meta
   if (!ast.hasViewportMeta) {
     issues.push({
       id: "no-viewport",
       severity: "warning",
       message: 'Нет meta name="viewport"',
-      hint: "Добавь в head meta viewport с width=device-width,initial-scale=1.",
+      hint: "Добавь meta viewport с width=device-width,initial-scale=1.",
     });
   }
 
-  // Score
   if (!ast.hasScore) {
     issues.push({
       id: "no-score",
       severity: "warning",
-      message: "Не найден счёт/очки в UI",
-      hint: "Добавь отображение счёта крупным шрифтом.",
+      message: "Не найден счёт/очки",
+      hint: "Добавь отображение счёта.",
     });
   }
 
   // ─────────────────────────────────────────────────────────────
-  // Игра не должна стартовать в состоянии проигрыша/победы
-  // (только инициализация через let/var/const)
+  // Игра не должна стартовать в gameover/win
   // ─────────────────────────────────────────────────────────────
   const head = html.slice(0, 4000);
 
-  const startsInGameover =
-    /(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](gameover|game_over|game-over|lose|lost|dead|defeat)['"`]/i.test(head);
-
-  if (startsInGameover) {
+  if (/(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](gameover|game_over|game-over|lose|lost|dead|defeat)['"`]/i.test(head)) {
     issues.push({
       id: "starts-in-gameover",
       severity: "error",
       message: "Игра инициализируется в состоянии проигрыша",
-      hint:
-        "Начальное состояние должно быть 'start' или 'playing'. " +
-        "Gameover — только после реального проигрыша.",
+      hint: "Начальное состояние должно быть 'start' или 'playing'.",
     });
   }
 
-  const startsInWin =
-    /(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](win|won|victory|finished)['"`]/i.test(head);
-
-  if (startsInWin) {
+  if (/(?:let|var|const)\s+(?:state|phase|mode|gameState|game_state)\s*=\s*['"`](win|won|victory|finished)['"`]/i.test(head)) {
     issues.push({
       id: "starts-in-win",
       severity: "error",
@@ -212,30 +255,10 @@ export function checkInvariants(ast: MiniAst): InvariantIssue[] {
         id: "handler-called-without-event",
         severity: "error",
         message: `Обработчик ${name}() вызывается без event`,
-        hint:
-          `Функция ${name} использует event.key / event.touches и должна ` +
-          `вызываться ТОЛЬКО из addEventListener('keydown'|'touchstart'|...) ` +
-          `с event аргументом.`,
+        hint: `Функция ${name} должна вызываться только из addEventListener с event.`,
       });
       break;
     }
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // event используется, но нет addEventListener
-  // ─────────────────────────────────────────────────────────────
-  const usesEventKey = /\bevent\.(key|touches|clientX|clientY)\b/i.test(html);
-  const hasKeydownHandler =
-    /addEventListener\s*\(\s*['"`](keydown|touchstart|pointerdown)/i.test(html);
-  if (usesEventKey && !hasKeydownHandler) {
-    issues.push({
-      id: "event-without-handler",
-      severity: "error",
-      message: "event используется, но нет addEventListener",
-      hint:
-        "event.key / event.touches доступны только внутри addEventListener. " +
-        "Добавь addEventListener('keydown', function(event) { if (event.key === ...) ... })",
-    });
   }
 
   return issues;

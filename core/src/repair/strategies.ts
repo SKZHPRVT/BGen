@@ -1,47 +1,89 @@
 import type { AnalysisReport } from "../types.ts";
 
 /**
- * Специальная подсказка для типичных ошибок canvas —
- * чтобы GigaChat понял что делать.
+ * Специальные подсказки для типичных ошибок — чтобы GigaChat понял что делать.
  */
 export function buildCanvasSpecificHint(errorIds: string[]): string {
   const hints: string[] = [];
 
   if (errorIds.includes("hardcoded-canvas-size")) {
-    hints.push(`КРИТИЧНО ПРО CANVAS:
-Canvas имеет фиксированные размеры (например 400x400), поэтому игра маленькая и не на весь экран.
-Замени на:
-
+    hints.push(`CANVAS SIZE:
+Замени фиксированные размеры на:
   const dpr = window.devicePixelRatio || 1;
   canvas.width = window.innerWidth * dpr;
   canvas.height = window.innerHeight * dpr;
   canvas.style.width = window.innerWidth + 'px';
   canvas.style.height = window.innerHeight + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-И добавь обработчик resize:
-  window.addEventListener('resize', () => { /* тот же код */ });
-
-Все координаты игровых объектов — через window.innerWidth и window.innerHeight.
-Не хардкодь 400, 600, 800.`);
++ addEventListener('resize', тот же код).`);
   }
 
   if (errorIds.includes("canvas-no-drawing")) {
-    hints.push(`КРИТИЧНО ПРО ОТРИСОВКУ:
-Canvas есть, но в коде нет команд отрисовки (fillRect/fillText/clearRect). Игра ничего не покажет.
-Добавь функцию render() и вызывай её из игрового цикла:
-
+    hints.push(`DRAWING:
+Canvas есть, но нет отрисовки. Добавь render():
   function render() {
     ctx.fillStyle = '#111';
     ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
-    // рисуем игровые объекты через fillRect или fillText
+    // рисуй игровые объекты через fillRect / fillText
   }`);
   }
 
+  if (errorIds.includes("invalid-calc-syntax")) {
+    hints.push(`CSS CALC():
+В calc() пробелы вокруг операторов ОБЯЗАТЕЛЬНЫ:
+  ПРАВИЛЬНО: calc(50% - 50vw), calc(100% - 20px)
+  НЕПРАВИЛЬНО: calc(50%-50vw)`);
+  }
+
+  if (errorIds.includes("controls-no-flex") || errorIds.includes("button-position-fixed")) {
+    hints.push(`КНОПКИ УПРАВЛЕНИЯ:
+#controls — display: flex, position: fixed снизу по центру. Кнопки внутри — flex-элементы, БЕЗ position: fixed.
+
+  #controls {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 16px;
+    z-index: 10;
+  }
+  #controls button {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.4);
+    color: #fff;
+    font-size: 28px;
+  }
+
+HTML:
+  <div id="controls">
+    <button id="btnLeft" data-dir="left">◀</button>
+    <button id="btnUp" data-dir="up">▲</button>
+    <button id="btnDown" data-dir="down">▼</button>
+    <button id="btnRight" data-dir="right">▶</button>
+  </div>
+
+JS:
+  document.querySelectorAll('#controls button').forEach(btn => {
+    btn.addEventListener('click', () => setDir(btn.dataset.dir));
+  });`);
+  }
+
+  if (errorIds.includes("textcontent-vs-entity")) {
+    hints.push(`СРАВНЕНИЕ КНОПОК:
+НЕ используй event.target.textContent === '&larr;'.
+textContent возвращает символ (◀), а не entity (&larr;).
+Используй data-dir на кнопке:
+  <button data-dir="left">◀</button>
+  btn.addEventListener('click', () => setDir(btn.dataset.dir));`);
+  }
+
   if (errorIds.includes("bad-arrow-entities")) {
-    hints.push(`ИСПРАВЬ СТРЕЛКИ:
-Не используй &uarr; &darr; &upp; &dow; — они показываются как текст.
-Используй символы напрямую: ◀ ▲ ▼ ▶`);
+    hints.push(`СТРЕЛКИ:
+Используй символы напрямую: ◀ ▲ ▼ ▶
+ЗАПРЕЩЕНЫ: &larr; &uarr; &darr; &rarr; &upp; &dow;`);
   }
 
   return hints.join("\n\n");
@@ -53,7 +95,6 @@ export function buildRepairMessage(report: AnalysisReport, previousCode: string)
   lines.push("THE PREVIOUS GENERATION FAILED VALIDATION.");
   lines.push("");
 
-  // Специальные подсказки для canvas и стрелок
   const canvasHint = buildCanvasSpecificHint(report.errors.map((e) => e.id));
   if (canvasHint) {
     lines.push(canvasHint);
@@ -85,9 +126,8 @@ export function buildRepairMessage(report: AnalysisReport, previousCode: string)
   lines.push("");
   lines.push("FIX THE LISTED ISSUES.");
   lines.push("Requirements:");
-  lines.push("- Return the FULL updated HTML file (not a diff).");
+  lines.push("- Return the FULL updated HTML file.");
   lines.push("- Keep everything that already works.");
-  lines.push("- Do not add extra features beyond the requested fixes.");
   lines.push("- Output only code. Start with <!DOCTYPE html>, end with </html>.");
 
   return lines.join("\n");
